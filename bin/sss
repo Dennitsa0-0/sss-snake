@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION='0.3.0'
+VERSION='0.4.0'
 
 show_help() {
   cat <<'HELP'
@@ -30,6 +30,9 @@ Game options:
   --wrap           Enable wrap-around edges.
   --no-wrap        Keep edges as walls.
   --path-refresh N Rebuild autopilot path every N ticks.
+  --ai MODE        Autopilot mode: safe, smart, dumb.
+  --max-ai-cells N Use greedy AI above this board area.
+  --max-ai-steps N Maximum BFS nodes per path rebuild.
   --idle-ticks N   Ticks before manual mode returns to autopilot.
   --theme NAME     classic, matrix, ocean, ember, mono.
   --ascii          Use ASCII symbols.

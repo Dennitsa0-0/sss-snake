@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.4.0
+
+- Changed the default installer prefix to `/usr/local` for root and `$HOME/.local` for regular users.
+- Added explicit `--user`, `--system`, and `--prefix PATH` installer modes.
+- Added mode-aware uninstall commands without removing source checkouts or high scores.
+- Made installer output honest about PATH and direct-run commands.
+- Ensured installed `sss` and `sss-snake` files are copied with executable mode `0755`.
+- Changed the default autopilot to fast `--ai safe`, prioritizing smooth movement over perfect pathfinding.
+- Added `--ai smart` and `--ai dumb` modes.
+- Added `--path-refresh`, `--max-ai-cells`, and `--max-ai-steps` controls for bounded pathfinding.
+- Reworked smart autopilot to cache paths and use one limited BFS from the snake head.
+- Reduced default board size and fruit count for smoother server sessions.
+- Updated README install, update, uninstall, and autopilot documentation.
+
 ## 0.3.0
 
 - Added terminal-capped board sizing with a clear small-terminal error.

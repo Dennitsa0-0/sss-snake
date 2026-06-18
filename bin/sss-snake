@@ -6,7 +6,7 @@ if (( BASH_VERSINFO[0] < 4 )); then
   exit 1
 fi
 
-VERSION='0.3.0'
+VERSION='0.4.0'
 
 show_help() {
   cat <<'HELP'
@@ -20,13 +20,16 @@ Arguments:
   delay              Frame delay in seconds. Default: 0.12
 
 Options:
-  --width N          Board width. Default: 60, capped by terminal
-  --height N         Board height. Default: 18, capped by terminal
-  --fruits N         Fruits on the board, 1..20. Default: 5
+  --width N          Board width. Default: 50, capped by terminal
+  --height N         Board height. Default: 16, capped by terminal
+  --fruits N         Fruits on the board, 1..20. Default: 4
   --big-food         Fruit hitboxes use radius 1
   --wrap             Enable wrap-around edges
   --no-wrap          Keep edges as walls. Default
-  --path-refresh N   Rebuild autopilot path every N ticks. Default: 5
+  --path-refresh N   Rebuild smart autopilot path every N ticks. Default: 10
+  --ai MODE          Autopilot mode: safe, smart, dumb. Default: safe
+  --max-ai-cells N   Use greedy AI above this board area. Default: 1200
+  --max-ai-steps N   Maximum BFS nodes per path rebuild. Default: 300
   --idle-ticks N     Ticks before manual mode returns to autopilot
   --theme NAME       classic, matrix, ocean, ember, mono
   --ascii            Force ASCII symbols
@@ -45,9 +48,12 @@ Controls:
 Environment:
   SSS_WIDTH          Default board width
   SSS_HEIGHT         Default board height
-  SSS_FRUITS         Default fruit count, 5
+  SSS_FRUITS         Default fruit count, 4
   SSS_IDLE_TICKS     Default idle ticks, 160
-  SSS_PATH_REFRESH   Default path refresh ticks, 5
+  SSS_PATH_REFRESH   Default path refresh ticks, 10
+  SSS_AI             Default AI mode: safe, smart, dumb
+  SSS_MAX_AI_CELLS   Default max board cells for smart BFS, 1200
+  SSS_MAX_AI_STEPS   Default BFS node limit, 300
   SSS_THEME          Default theme
   SSS_ASCII=1        Use ASCII symbols
   SSS_NO_SCORE=1     Disable high score persistence
@@ -91,10 +97,13 @@ utf8_available() {
 DELAY='0.12'
 WIDTH_ARG=''
 HEIGHT_ARG=''
-FRUIT_TARGET="${SSS_FRUITS:-5}"
+FRUIT_TARGET="${SSS_FRUITS:-4}"
 BIG_FOOD=0
 WRAP=0
-PATH_REFRESH="${SSS_PATH_REFRESH:-5}"
+PATH_REFRESH="${SSS_PATH_REFRESH:-10}"
+AI_MODE="${SSS_AI:-safe}"
+MAX_AI_CELLS="${SSS_MAX_AI_CELLS:-1200}"
+MAX_AI_STEPS="${SSS_MAX_AI_STEPS:-300}"
 IDLE_TICKS="${SSS_IDLE_TICKS:-160}"
 THEME="${SSS_THEME:-classic}"
 UNICODE_MODE='auto'
@@ -150,6 +159,23 @@ while [[ $# -gt 0 ]]; do
       PATH_REFRESH="$2"
       shift 2
       ;;
+    --ai)
+      [[ $# -ge 2 ]] || die "--ai requires a value"
+      AI_MODE="$2"
+      shift 2
+      ;;
+    --max-ai-cells)
+      [[ $# -ge 2 ]] || die "--max-ai-cells requires a value"
+      is_uint "$2" || die "--max-ai-cells must be a positive integer"
+      MAX_AI_CELLS="$2"
+      shift 2
+      ;;
+    --max-ai-steps|--max-ai-steps-per-tick)
+      [[ $# -ge 2 ]] || die "--max-ai-steps requires a value"
+      is_uint "$2" || die "--max-ai-steps must be a positive integer"
+      MAX_AI_STEPS="$2"
+      shift 2
+      ;;
     --idle-ticks)
       [[ $# -ge 2 ]] || die "--idle-ticks requires a value"
       is_uint "$2" || die "--idle-ticks must be a positive integer"
@@ -194,10 +220,19 @@ done
 [[ "$DELAY" =~ ^([0-9]+([.][0-9]+)?|[.][0-9]+)$ ]] || die "delay must be a number"
 is_uint "$IDLE_TICKS" || die "idle ticks must be a positive integer"
 is_uint "$PATH_REFRESH" || die "path refresh must be a positive integer"
+is_uint "$MAX_AI_CELLS" || die "max AI cells must be a positive integer"
+is_uint "$MAX_AI_STEPS" || die "max AI steps must be a positive integer"
 is_uint "$FRUIT_TARGET" || die "fruit count must be a positive integer"
 (( IDLE_TICKS < 1 )) && IDLE_TICKS=1
 (( PATH_REFRESH < 1 )) && PATH_REFRESH=1
+(( MAX_AI_CELLS < 1 )) && MAX_AI_CELLS=1
+(( MAX_AI_STEPS < 1 )) && MAX_AI_STEPS=1
 FRUIT_TARGET="$(clamp "$FRUIT_TARGET" 1 20)"
+
+case "$AI_MODE" in
+  safe|smart|dumb) ;;
+  *) die "ai mode must be safe, smart, or dumb" ;;
+esac
 
 cols="$(terminal_number cols 80)"
 lines="$(terminal_number lines 24)"
@@ -209,8 +244,8 @@ fi
 
 max_w=$((cols - 4))
 max_h=$((lines - 7))
-W="${WIDTH_ARG:-${SSS_WIDTH:-60}}"
-H="${HEIGHT_ARG:-${SSS_HEIGHT:-18}}"
+W="${WIDTH_ARG:-${SSS_WIDTH:-50}}"
+H="${HEIGHT_ARG:-${SSS_HEIGHT:-16}}"
 
 is_uint "$W" || die "width must be a positive integer"
 is_uint "$H" || die "height must be a positive integer"
@@ -331,8 +366,8 @@ save_high_score() {
   printf '%s\n' "$score_total" >"$score_file" 2>/dev/null || true
 }
 
-declare -a body_x body_y fruit_x fruit_y fruit_type fruit_points fruit_grow fruit_radius auto_path bfs_result
-declare -A snake fruit_center fruit_hit fruit_symbol fruit_score fruit_growth bfs_targets
+declare -a body_x body_y fruit_x fruit_y fruit_type fruit_points fruit_grow fruit_radius path_x path_y bfs_path_x bfs_path_y
+declare -A snake fruit_center fruit_hit fruit_symbol fruit_score fruit_growth
 
 score_total=0
 score_auto_away=0
@@ -346,7 +381,7 @@ growth_pending=0
 eat_grow=0
 fruit_count=0
 tick=0
-auto_path_pos=0
+path_index=0
 path_dirty=1
 old_stty=''
 
@@ -462,8 +497,9 @@ reset_board() {
   fruit_grow=()
   fruit_radius=()
   fruit_count=0
-  auto_path=()
-  auto_path_pos=0
+  path_x=()
+  path_y=()
+  path_index=0
   path_dirty=1
 
   length=5
@@ -647,23 +683,125 @@ move_to() {
   fi
 }
 
-bfs_to_targets() {
-  local start_x="${body_x[0]}" start_y="${body_y[0]}"
-  local -a qx qy rev
-  local -A seen parent
-  local head=0 tail=0 x y nx ny key nkey found='' d prev cx cy px py i
+left_of() {
+  case "$1" in
+    UP) printf 'LEFT\n' ;;
+    LEFT) printf 'DOWN\n' ;;
+    DOWN) printf 'RIGHT\n' ;;
+    RIGHT) printf 'UP\n' ;;
+  esac
+}
 
-  bfs_result=()
+right_of() {
+  case "$1" in
+    UP) printf 'RIGHT\n' ;;
+    RIGHT) printf 'DOWN\n' ;;
+    DOWN) printf 'LEFT\n' ;;
+    LEFT) printf 'UP\n' ;;
+  esac
+}
+
+direction_safe() {
+  local d="$1" nx ny
+  opposite_dir "$dir" "$d" && return 1
+  read -r nx ny < <(next_coord "$d" "${body_x[0]}" "${body_y[0]}")
+  safe_cell "$nx" "$ny" 1
+}
+
+nearest_fruit() {
+  local i hx="${body_x[0]}" hy="${body_y[0]}" x y dist best_dist=-1 best_x='' best_y=''
+  for ((i=0; i<fruit_count; i++)); do
+    [[ -n "${fruit_x[$i]+x}" ]] || continue
+    x="${fruit_x[$i]}"
+    y="${fruit_y[$i]}"
+    dist=$(( (hx > x ? hx - x : x - hx) + (hy > y ? hy - y : y - hy) ))
+    if (( best_dist < 0 || dist < best_dist )); then
+      best_dist="$dist"
+      best_x="$x"
+      best_y="$y"
+    fi
+  done
+  [[ -n "$best_x" ]] || return 1
+  printf '%s %s\n' "$best_x" "$best_y"
+}
+
+try_direction_list() {
+  local d seen=''
+  for d in "$@"; do
+    [[ -n "$d" ]] || continue
+    [[ " $seen " == *" $d "* ]] && continue
+    seen+=" $d"
+    if direction_safe "$d"; then
+      printf '%s\n' "$d"
+      return 0
+    fi
+  done
+  return 1
+}
+
+choose_safe_direction() {
+  local hx="${body_x[0]}" hy="${body_y[0]}" fx fy first='' second='' left right d
+  if read -r fx fy < <(nearest_fruit); then
+    if (( fx < hx )); then first='LEFT'; elif (( fx > hx )); then first='RIGHT'; fi
+    if (( fy < hy )); then second='UP'; elif (( fy > hy )); then second='DOWN'; fi
+    if try_direction_list "$first" "$second"; then
+      return 0
+    fi
+    if try_direction_list "$second" "$first"; then
+      return 0
+    fi
+  fi
+
+  left="$(left_of "$dir")"
+  right="$(right_of "$dir")"
+  if try_direction_list "$dir" "$left" "$right"; then
+    return 0
+  fi
+
+  for d in UP RIGHT DOWN LEFT; do
+    if direction_safe "$d"; then
+      printf '%s\n' "$d"
+      return 0
+    fi
+  done
+  return 1
+}
+
+choose_dumb_direction() {
+  local left right d
+  left="$(left_of "$dir")"
+  right="$(right_of "$dir")"
+  if try_direction_list "$dir" "$left" "$right"; then
+    return 0
+  fi
+  for d in UP RIGHT DOWN LEFT; do
+    if direction_safe "$d"; then
+      printf '%s\n' "$d"
+      return 0
+    fi
+  done
+  return 1
+}
+
+build_smart_path() {
+  local start_x="${body_x[0]}" start_y="${body_y[0]}"
+  local -a qx qy revx revy
+  local -A seen parent
+  local head=0 tail=0 steps=0 x y nx ny key nkey found='' d prev cx cy px py i
+
+  bfs_path_x=()
+  bfs_path_y=()
   qx[$tail]=$start_x; qy[$tail]=$start_y; tail=$((tail + 1))
   seen["$start_x,$start_y"]=1
 
-  while (( head < tail )); do
+  while (( head < tail && steps < MAX_AI_STEPS )); do
     x="${qx[$head]}"
     y="${qy[$head]}"
     head=$((head + 1))
+    steps=$((steps + 1))
     key="$x,$y"
 
-    if [[ -n "${bfs_targets[$key]+x}" && "$key" != "$start_x,$start_y" ]]; then
+    if [[ -n "${fruit_hit[$key]+x}" && "$key" != "$start_x,$start_y" ]]; then
       found="$key"
       break
     fi
@@ -686,116 +824,87 @@ bfs_to_targets() {
   cx="${found%,*}"
   cy="${found#*,}"
   while [[ "$cx,$cy" != "$start_x,$start_y" ]]; do
+    revx+=("$cx")
+    revy+=("$cy")
     prev="${parent[$cx,$cy]}"
     px="${prev%,*}"
     py="${prev#*,}"
-    rev+=("$(direction_to "$px" "$py" "$cx" "$cy")")
     cx="$px"
     cy="$py"
   done
 
-  for ((i=${#rev[@]}-1; i>=0; i--)); do
-    bfs_result+=("${rev[$i]}")
+  for ((i=${#revx[@]}-1; i>=0; i--)); do
+    bfs_path_x+=("${revx[$i]}")
+    bfs_path_y+=("${revy[$i]}")
   done
-  (( ${#bfs_result[@]} > 0 ))
-}
-
-build_food_path() {
-  local i x y r dx dy hx hy key d best_len=-1
-  local -a candidate best
-
-  for ((i=0; i<fruit_count; i++)); do
-    [[ -n "${fruit_x[$i]+x}" ]] || continue
-    bfs_targets=()
-    x="${fruit_x[$i]}"; y="${fruit_y[$i]}"; r="${fruit_radius[$i]}"
-    for ((dy=-r; dy<=r; dy++)); do
-      for ((dx=-r; dx<=r; dx++)); do
-        hx=$((x + dx)); hy=$((y + dy))
-        (( hx >= 0 && hx < W && hy >= 0 && hy < H )) || continue
-        bfs_targets["$hx,$hy"]=1
-      done
-    done
-    if bfs_to_targets; then
-      candidate=("${bfs_result[@]}")
-      d="${#candidate[@]}"
-      if (( best_len < 0 || d < best_len )); then
-        best_len=$d
-        best=("${candidate[@]}")
-      fi
-    fi
-  done
-
-  if (( best_len >= 0 )); then
-    auto_path=("${best[@]}")
-    auto_path_pos=0
-    return 0
-  fi
-  return 1
-}
-
-build_tail_path() {
-  local tail_x tail_y
-  tail_x="${body_x[$((length - 1))]}"
-  tail_y="${body_y[$((length - 1))]}"
-  bfs_targets=()
-  bfs_targets["$tail_x,$tail_y"]=1
-  if bfs_to_targets; then
-    auto_path=("${bfs_result[@]}")
-    auto_path_pos=0
-    return 0
-  fi
-  auto_path_pos=0
-  return 1
-}
-
-choose_safe_direction() {
-  local d nx ny
-  for d in "$dir" UP RIGHT DOWN LEFT; do
-    opposite_dir "$dir" "$d" && continue
-    read -r nx ny < <(next_coord "$d" "${body_x[0]}" "${body_y[0]}")
-    if safe_cell "$nx" "$ny" 1; then
-      printf '%s\n' "$d"
-      return 0
-    fi
-  done
-  return 1
+  (( ${#bfs_path_x[@]} > 0 ))
 }
 
 rebuild_auto_path() {
-  auto_path=()
-  auto_path_pos=0
-  if build_food_path; then
+  path_x=()
+  path_y=()
+  path_index=0
+
+  if (( W * H > MAX_AI_CELLS )); then
+    path_dirty=0
+    return 1
+  fi
+
+  if build_smart_path; then
+    path_x=("${bfs_path_x[@]}")
+    path_y=("${bfs_path_y[@]}")
     path_dirty=0
     return 0
   fi
-  if build_tail_path; then
-    path_dirty=0
-    return 0
-  fi
+
   path_dirty=0
   return 1
+}
+
+follow_cached_path() {
+  local nx ny d
+  (( path_index < ${#path_x[@]} )) || return 1
+  nx="${path_x[$path_index]}"
+  ny="${path_y[$path_index]}"
+  safe_cell "$nx" "$ny" 1 || return 1
+  d="$(direction_to "${body_x[0]}" "${body_y[0]}" "$nx" "$ny")"
+  opposite_dir "$dir" "$d" && return 1
+  dir="$d"
+  path_index=$((path_index + 1))
+  move_to "$nx" "$ny"
+  return 0
 }
 
 auto_step() {
   local d nx ny
   tick=$((tick + 1))
-  if (( path_dirty == 1 || tick % PATH_REFRESH == 0 || auto_path_pos >= ${#auto_path[@]} )); then
-    rebuild_auto_path || true
-  fi
 
-  if (( auto_path_pos < ${#auto_path[@]} )); then
-    d="${auto_path[$auto_path_pos]}"
-    read -r nx ny < <(next_coord "$d" "${body_x[0]}" "${body_y[0]}")
-    if safe_cell "$nx" "$ny" 1 || [[ -n "${fruit_hit[$nx,$ny]+x}" ]]; then
-      dir="$d"
-      auto_path_pos=$((auto_path_pos + 1))
-      move_to "$nx" "$ny"
+  if [[ "$AI_MODE" == "smart" ]]; then
+    if follow_cached_path; then
       return
     fi
-    path_dirty=1
+
+    if (( path_index < ${#path_x[@]} )); then
+      path_dirty=1
+    fi
+    path_x=()
+    path_y=()
+    path_index=0
+    if (( path_dirty == 1 || tick % PATH_REFRESH == 0 )); then
+      rebuild_auto_path >/dev/null 2>&1 || true
+      if follow_cached_path; then
+        return
+      fi
+    fi
   fi
 
-  if d="$(choose_safe_direction)"; then
+  if [[ "$AI_MODE" == "dumb" ]]; then
+    d="$(choose_dumb_direction)" || d=''
+  else
+    d="$(choose_safe_direction)" || d=''
+  fi
+
+  if [[ -n "$d" ]]; then
     dir="$d"
     read -r nx ny < <(next_coord "$dir" "${body_x[0]}" "${body_y[0]}")
     move_to "$nx" "$ny"

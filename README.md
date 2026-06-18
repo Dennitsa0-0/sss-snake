@@ -7,30 +7,64 @@
 
 ## Install / Установка
 
-Quick HTTPS install and run:
+Quick HTTPS server install and run:
 
 Use HTTPS if you just want to install SSS Snake.
-Use SSH if your GitHub SSH key is already configured.
+Use SSH only if GitHub SSH access is already configured on this machine.
 
 Используйте HTTPS для обычной установки.
-Используйте SSH только если на сервере уже настроен GitHub SSH-ключ.
+Используйте SSH только если на этой машине уже настроен GitHub SSH-доступ.
 
 ```bash
 mkdir -p "$HOME/src" && \
 git clone https://github.com/Dennitsa0-0/sss-snake.git "$HOME/src/sss-snake" && \
 cd "$HOME/src/sss-snake" && \
-./install.sh && \
-export PATH="$HOME/.local/bin:$PATH" && \
+bash ./install.sh --system && \
 sss
 ```
 
-SSH install, if you already have a GitHub SSH key configured:
+For a non-root user that wants a system install:
+
+```bash
+mkdir -p "$HOME/src" && \
+git clone https://github.com/Dennitsa0-0/sss-snake.git "$HOME/src/sss-snake" && \
+cd "$HOME/src/sss-snake" && \
+sudo bash ./install.sh --system && \
+sss
+```
+
+User install without root permissions:
+
+```bash
+mkdir -p "$HOME/src" && \
+git clone https://github.com/Dennitsa0-0/sss-snake.git "$HOME/src/sss-snake" && \
+cd "$HOME/src/sss-snake" && \
+bash ./install.sh --user
+```
+
+Then run:
+
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+sss
+```
+
+Or run directly:
+
+```bash
+"$HOME/.local/bin/sss"
+```
+
+SSH install:
+
+Use SSH only if GitHub SSH access is already configured on this machine.
 
 ```bash
 mkdir -p "$HOME/src" && \
 git clone git@github.com:Dennitsa0-0/sss-snake.git "$HOME/src/sss-snake" && \
 cd "$HOME/src/sss-snake" && \
-./install.sh
+bash ./install.sh --system && \
+sss
 ```
 
 Repository URLs:
@@ -40,7 +74,7 @@ HTTPS: https://github.com/Dennitsa0-0/sss-snake.git
 SSH:   git@github.com:Dennitsa0-0/sss-snake.git
 ```
 
-Run after install:
+Run after a system install, or after adding the user install directory to PATH:
 
 ```bash
 sss
@@ -63,14 +97,37 @@ Update:
 ```bash
 cd "$HOME/src/sss-snake" && \
 git pull && \
-./install.sh
+bash ./install.sh --system && \
+sss
+```
+
+User install update:
+
+```bash
+cd "$HOME/src/sss-snake" && \
+git pull && \
+bash ./install.sh --user
 ```
 
 Uninstall:
 
 ```bash
 cd "$HOME/src/sss-snake" && \
-./install.sh --uninstall
+bash ./install.sh --uninstall --user
+```
+
+System uninstall:
+
+```bash
+cd "$HOME/src/sss-snake" && \
+bash ./install.sh --uninstall --system
+```
+
+Custom prefix uninstall:
+
+```bash
+cd "$HOME/src/sss-snake" && \
+bash ./install.sh --uninstall --prefix /custom/path
 ```
 
 <a id="english"></a>
@@ -100,7 +157,7 @@ Leave your SSH terminal open. The snake plays itself, keeps the screen alive, an
 - One-command launch with `sss`
 - Safe first-run tmux bootstrap
 - Works without tmux when tmux is unavailable
-- Autopilot mode for idle sessions: the snake uses BFS to seek reachable fruit
+- Fast safe autopilot for idle sessions
 - Manual play with arrows or `W A S D`
 - Several fruit types can appear at once: apple, pear, berry, and bonus
 - Walls are enabled by default; use `--wrap` only if you want classic wrap-around
@@ -141,27 +198,57 @@ sudo pacman -S git
 
 ### Install
 
-HTTPS install, recommended for normal installation:
+HTTPS server/system install, recommended for servers:
 
 ```bash
 mkdir -p "$HOME/src" && \
 git clone https://github.com/Dennitsa0-0/sss-snake.git "$HOME/src/sss-snake" && \
 cd "$HOME/src/sss-snake" && \
-./install.sh
+bash ./install.sh --system && \
+sss
 ```
 
-SSH install, only if your GitHub SSH key is already configured:
+For a non-root user that wants a system install:
+
+```bash
+mkdir -p "$HOME/src" && \
+git clone https://github.com/Dennitsa0-0/sss-snake.git "$HOME/src/sss-snake" && \
+cd "$HOME/src/sss-snake" && \
+sudo bash ./install.sh --system && \
+sss
+```
+
+User install without root permissions:
+
+```bash
+mkdir -p "$HOME/src" && \
+git clone https://github.com/Dennitsa0-0/sss-snake.git "$HOME/src/sss-snake" && \
+cd "$HOME/src/sss-snake" && \
+bash ./install.sh --user
+```
+
+After a user install, add it to your current shell PATH and run:
+
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+sss
+```
+
+Or run directly:
+
+```bash
+"$HOME/.local/bin/sss"
+```
+
+SSH install:
+
+Use SSH only if GitHub SSH access is already configured on this machine.
 
 ```bash
 mkdir -p "$HOME/src" && \
 git clone git@github.com:Dennitsa0-0/sss-snake.git "$HOME/src/sss-snake" && \
 cd "$HOME/src/sss-snake" && \
-./install.sh
-```
-
-Run:
-
-```bash
+bash ./install.sh --system && \
 sss
 ```
 
@@ -182,33 +269,48 @@ Update:
 ```bash
 cd "$HOME/src/sss-snake" && \
 git pull && \
-./install.sh
+bash ./install.sh --system && \
+sss
+```
+
+Update a user install:
+
+```bash
+cd "$HOME/src/sss-snake" && \
+git pull && \
+bash ./install.sh --user
 ```
 
 Install to a custom prefix:
 
 ```bash
-./install.sh --prefix /usr/local
+bash ./install.sh --prefix /opt/sss-snake
 ```
 
 If that prefix requires administrator permissions, run the installer yourself with `sudo`:
 
 ```bash
-sudo ./install.sh --prefix /usr/local
+sudo bash ./install.sh --prefix /usr/local
 ```
 
 The installer does not call `sudo` for its own installation.
 
-Uninstall from the default prefix:
+Uninstall from a user install:
 
 ```bash
-./install.sh --uninstall
+bash ./install.sh --uninstall --user
+```
+
+Uninstall from a system install:
+
+```bash
+bash ./install.sh --uninstall --system
 ```
 
 Uninstall from a custom prefix:
 
 ```bash
-./install.sh --uninstall --prefix /usr/local
+bash ./install.sh --uninstall --prefix /custom/path
 ```
 
 ### Quick Start
@@ -305,11 +407,14 @@ Game options:
 | --- | --- |
 | `--width N` | Set board width. It is capped by the terminal width. |
 | `--height N` | Set board height. It is capped by the terminal height. |
-| `--fruits N` | Set how many fruits are on the board, clamped to `1..20`. Default: `5`. |
+| `--fruits N` | Set how many fruits are on the board, clamped to `1..20`. Default: `4`. |
 | `--big-food` | Make fruit count as eaten within a 3x3 hitbox. |
 | `--wrap` | Enable wrap-around edges. |
 | `--no-wrap` | Use walls on board edges. This is the default. |
-| `--path-refresh N` | Rebuild the autopilot BFS path every N ticks. Default: `5`. |
+| `--path-refresh N` | Rebuild the smart autopilot path at most every N ticks. Default: `10`. |
+| `--ai MODE` | Autopilot mode: `safe`, `smart`, or `dumb`. Default: `safe`. |
+| `--max-ai-cells N` | Use greedy movement above this board area. Default: `1200`. |
+| `--max-ai-steps N` | Maximum BFS nodes per smart path rebuild. Default: `300`. |
 | `--idle-ticks N` | Return to autopilot after N idle ticks in manual mode. |
 | `--theme NAME` | Use `classic`, `matrix`, `ocean`, `ember`, or `mono`. |
 | `--ascii` | Use ASCII board and food symbols. Useful when Unicode renders badly. |
@@ -322,9 +427,16 @@ Examples:
 sss --theme ocean --width 60 --height 18
 sss --fruits 8 --big-food
 sss --ascii --width 60 --height 18
+sss --ai smart --path-refresh 15
+sss --ai dumb --width 80 --height 24
 sss --no-install --theme mono --ascii
 sss-snake 0.20 --theme matrix
 ```
+
+By default, SSS Snake uses a fast safe autopilot.
+It prefers smooth movement over perfect pathfinding.
+Use `--ai smart` for heavier pathfinding, or `--ai dumb` for maximum smoothness.
+Smart AI can be heavier on large fields, so large boards fall back to fast greedy movement unless you raise the AI limits.
 
 ### Controls
 
@@ -347,7 +459,10 @@ sss-snake 0.20 --theme matrix
 | `SSS_HEIGHT` | Default board height |
 | `SSS_FRUITS` | Default fruit count |
 | `SSS_IDLE_TICKS` | Idle ticks before returning to autopilot |
-| `SSS_PATH_REFRESH` | Autopilot BFS refresh interval |
+| `SSS_PATH_REFRESH` | Smart autopilot path refresh interval |
+| `SSS_AI` | Default AI mode: `safe`, `smart`, or `dumb` |
+| `SSS_MAX_AI_CELLS` | Default max board cells for smart BFS |
+| `SSS_MAX_AI_STEPS` | Default BFS node limit |
 | `SSS_THEME` | Default theme |
 | `SSS_ASCII=1` | Use ASCII symbols |
 | `SSS_NO_SCORE=1` | Disable high score persistence |
@@ -399,7 +514,9 @@ The only package installation `sss` can attempt is `tmux`, and only after explic
 
 ### Design
 
-Autopilot searches for the nearest reachable fruit with BFS. It respects walls, the snake body, fruit hitboxes, and the current wrap setting. If no fruit path is available, it tries to follow its tail, then chooses any safe non-reversing move.
+By default, SSS Snake uses `--ai safe`: a fast greedy autopilot that moves toward the nearest fruit while avoiding walls, the snake body, and 180-degree turns. Smooth movement is preferred over perfect pathfinding.
+
+`--ai smart` keeps a cached path to fruit and rebuilds it only occasionally or when it becomes stale. It uses one limited BFS from the snake head and stops when it finds a reachable fruit hitbox. If the path is not ready or becomes unsafe, the snake keeps moving with the same fast safe-move logic. `--ai dumb` avoids BFS entirely and only tries to keep moving safely.
 
 By default, the board edges are walls. Hitting a wall or the snake body restarts the round while keeping the total score and high score. Manual mode starts when you press arrows or `W A S D`; `T` or `Space` returns to autopilot, and idle manual play returns automatically after `--idle-ticks`.
 
@@ -471,27 +588,57 @@ sudo pacman -S git
 
 ### Установка
 
-Установка через HTTPS, рекомендуемый вариант для обычной установки:
+Установка через HTTPS, рекомендуемый вариант для сервера:
 
 ```bash
 mkdir -p "$HOME/src" && \
 git clone https://github.com/Dennitsa0-0/sss-snake.git "$HOME/src/sss-snake" && \
 cd "$HOME/src/sss-snake" && \
-./install.sh
+bash ./install.sh --system && \
+sss
 ```
 
-Установка через SSH, только если на сервере уже настроен GitHub SSH-ключ:
+Если обычному пользователю нужна system-установка:
+
+```bash
+mkdir -p "$HOME/src" && \
+git clone https://github.com/Dennitsa0-0/sss-snake.git "$HOME/src/sss-snake" && \
+cd "$HOME/src/sss-snake" && \
+sudo bash ./install.sh --system && \
+sss
+```
+
+Пользовательская установка без root-прав:
+
+```bash
+mkdir -p "$HOME/src" && \
+git clone https://github.com/Dennitsa0-0/sss-snake.git "$HOME/src/sss-snake" && \
+cd "$HOME/src/sss-snake" && \
+bash ./install.sh --user
+```
+
+После пользовательской установки добавьте путь в текущий shell и запустите:
+
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+sss
+```
+
+Или запустите напрямую:
+
+```bash
+"$HOME/.local/bin/sss"
+```
+
+Установка через SSH:
+
+Используйте SSH только если на этой машине уже настроен GitHub SSH-доступ.
 
 ```bash
 mkdir -p "$HOME/src" && \
 git clone git@github.com:Dennitsa0-0/sss-snake.git "$HOME/src/sss-snake" && \
 cd "$HOME/src/sss-snake" && \
-./install.sh
-```
-
-Запуск:
-
-```bash
+bash ./install.sh --system && \
 sss
 ```
 
@@ -512,33 +659,48 @@ export PATH="$HOME/.local/bin:$PATH"
 ```bash
 cd "$HOME/src/sss-snake" && \
 git pull && \
-./install.sh
+bash ./install.sh --system && \
+sss
+```
+
+Обновление пользовательской установки:
+
+```bash
+cd "$HOME/src/sss-snake" && \
+git pull && \
+bash ./install.sh --user
 ```
 
 Установка в другой prefix:
 
 ```bash
-./install.sh --prefix /usr/local
+bash ./install.sh --prefix /opt/sss-snake
 ```
 
 Если для prefix нужны права администратора, запустите установщик через `sudo` сами:
 
 ```bash
-sudo ./install.sh --prefix /usr/local
+sudo bash ./install.sh --prefix /usr/local
 ```
 
 Установщик не вызывает `sudo` для собственной установки.
 
-Удаление из prefix по умолчанию:
+Удаление пользовательской установки:
 
 ```bash
-./install.sh --uninstall
+bash ./install.sh --uninstall --user
+```
+
+Удаление system-установки:
+
+```bash
+bash ./install.sh --uninstall --system
 ```
 
 Удаление из другого prefix:
 
 ```bash
-./install.sh --uninstall --prefix /usr/local
+bash ./install.sh --uninstall --prefix /custom/path
 ```
 
 ### Быстрый старт
@@ -635,6 +797,14 @@ sss-snake --version
 | --- | --- |
 | `--width N` | Ширина поля, ограничивается диапазоном `20..100`. |
 | `--height N` | Высота поля, ограничивается диапазоном `10..40`. |
+| `--fruits N` | Количество фруктов на поле, `1..20`. По умолчанию: `4`. |
+| `--big-food` | Увеличить hitbox фруктов до 3x3. |
+| `--wrap` | Включить перенос через края поля. |
+| `--no-wrap` | Использовать стены по краям поля. Это режим по умолчанию. |
+| `--path-refresh N` | Пересобирать smart-маршрут не чаще чем раз в N тиков. По умолчанию: `10`. |
+| `--ai MODE` | Режим автопилота: `safe`, `smart` или `dumb`. По умолчанию: `safe`. |
+| `--max-ai-cells N` | Использовать greedy-режим, если площадь поля больше этого значения. По умолчанию: `1200`. |
+| `--max-ai-steps N` | Максимум BFS-узлов на один пересчет smart-маршрута. По умолчанию: `300`. |
 | `--idle-ticks N` | Через сколько idle-тиков ручной режим вернется в автопилот. |
 | `--theme NAME` | Тема: `classic`, `matrix`, `ocean`, `ember`, `mono`. |
 | `--ascii` | Использовать ASCII-символы. |
@@ -645,9 +815,18 @@ sss-snake --version
 
 ```bash
 sss --theme ocean --width 60 --height 18
+sss --fruits 8 --big-food
+sss --ai smart --path-refresh 15
+sss --ai dumb --width 80 --height 24
 sss --no-install --theme mono --ascii
 sss-snake 0.20 --theme matrix
 ```
+
+По умолчанию SSS Snake использует быстрый безопасный автопилот.
+Главный приоритет — плавное движение, а не идеальный поиск пути.
+Для более умного, но тяжёлого режима используйте `--ai smart`.
+Для максимально лёгкого режима используйте `--ai dumb`.
+На больших полях smart AI может быть тяжелее, поэтому игра использует быстрый greedy-режим, если поле превышает лимит AI.
 
 ### Управление
 
@@ -668,7 +847,12 @@ sss-snake 0.20 --theme matrix
 | `SSS_NO_INSTALL_PROMPT=1` | Не спрашивать про установку tmux |
 | `SSS_WIDTH` | Ширина поля по умолчанию |
 | `SSS_HEIGHT` | Высота поля по умолчанию |
+| `SSS_FRUITS` | Количество фруктов по умолчанию |
 | `SSS_IDLE_TICKS` | Idle-тики до возврата в автопилот |
+| `SSS_PATH_REFRESH` | Интервал пересчета smart-маршрута |
+| `SSS_AI` | Режим AI по умолчанию: `safe`, `smart` или `dumb` |
+| `SSS_MAX_AI_CELLS` | Максимальная площадь поля для smart BFS |
+| `SSS_MAX_AI_STEPS` | Лимит BFS-узлов на один пересчет |
 | `SSS_THEME` | Тема по умолчанию |
 | `SSS_ASCII=1` | Использовать ASCII-символы |
 | `SSS_NO_SCORE=1` | Отключить сохранение лучшего счета |
@@ -720,6 +904,8 @@ SSS Snake не делает этого:
 
 ### Устройство
 
-Автопилот идет по детерминированному маршруту по всему полю. Он со временем добирается до любого яблока и не врезается в себя. Ручной режим работает как обычная змейка с переносом через края поля. Если ручной режим долго остается без ввода, игра нормализует змейку обратно на безопасный маршрут автопилота и продолжает.
+По умолчанию SSS Snake использует `--ai safe`: быстрый greedy-автопилот, который идет к ближайшему фрукту, избегает стен, тела змейки и разворота на 180 градусов. Главный приоритет - плавное движение, а не идеальный поиск пути.
+
+`--ai smart` хранит кэшированный маршрут к фрукту и пересчитывает его только иногда или когда маршрут устарел. Он использует один ограниченный BFS от головы змейки и останавливается, когда находит достижимый hitbox фрукта. Если маршрут не готов или стал опасным, змейка продолжает движение через быстрый safe move. `--ai dumb` вообще не использует BFS и только старается двигаться безопасно.
 
 [Наверх](#sss-snake)

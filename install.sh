@@ -37,6 +37,7 @@ HELP
 done
 
 bin_dir="$prefix/bin"
+state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/sss-snake"
 
 if [[ "$action" == 'uninstall' ]]; then
   rm -f "$bin_dir/sss" "$bin_dir/sss-snake"
@@ -45,6 +46,7 @@ if [[ "$action" == 'uninstall' ]]; then
 fi
 
 mkdir -p "$bin_dir"
+mkdir -p "$state_dir" 2>/dev/null || true
 install -m 0755 "$(dirname "$0")/bin/sss" "$bin_dir/sss"
 install -m 0755 "$(dirname "$0")/bin/sss-snake" "$bin_dir/sss-snake"
 
@@ -54,7 +56,8 @@ echo "Run: sss"
 case ":$PATH:" in
   *":$bin_dir:"*) ;;
   *)
-    echo "Note: $bin_dir is not in PATH. Add this to your shell profile:"
+    echo "Note: $bin_dir is not in PATH."
+    echo "Add this line to your shell profile if the sss command is not found:"
     echo "  export PATH=\"$bin_dir:\$PATH\""
     ;;
 esac

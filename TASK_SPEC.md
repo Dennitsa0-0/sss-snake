@@ -396,7 +396,115 @@ sss-snake/
 `-- LICENSE
 ```
 
-## 13. README Language Requirements
+## 13. GitHub Install Requirements
+
+Users must be able to open the README, copy one command block, paste it into a server terminal, and end with a working `sss` command.
+
+Repository URLs:
+
+```text
+HTTPS: https://github.com/Dennitsa0-0/sss-snake.git
+SSH:   git@github.com:Dennitsa0-0/sss-snake.git
+```
+
+The HTTPS URL is the default for normal users. The SSH URL is for users with a configured GitHub SSH key.
+
+Default source checkout path:
+
+```text
+$HOME/src/sss-snake
+```
+
+README must include HTTPS install:
+
+```bash
+mkdir -p "$HOME/src" && \
+git clone https://github.com/Dennitsa0-0/sss-snake.git "$HOME/src/sss-snake" && \
+cd "$HOME/src/sss-snake" && \
+./install.sh
+```
+
+README must include SSH install:
+
+```bash
+mkdir -p "$HOME/src" && \
+git clone git@github.com:Dennitsa0-0/sss-snake.git "$HOME/src/sss-snake" && \
+cd "$HOME/src/sss-snake" && \
+./install.sh
+```
+
+README should also include a copy-paste install-and-run command that temporarily adds `$HOME/.local/bin` to `PATH` for the current shell:
+
+```bash
+mkdir -p "$HOME/src" && \
+git clone https://github.com/Dennitsa0-0/sss-snake.git "$HOME/src/sss-snake" && \
+cd "$HOME/src/sss-snake" && \
+./install.sh && \
+export PATH="$HOME/.local/bin:$PATH" && \
+sss
+```
+
+Default install prefix:
+
+```text
+$HOME/.local
+```
+
+Default installed files:
+
+```text
+$HOME/.local/bin/sss
+$HOME/.local/bin/sss-snake
+```
+
+`install.sh` must:
+
+1. determine the install prefix;
+2. create `$prefix/bin` when missing;
+3. copy `bin/sss` to `$prefix/bin/sss`;
+4. copy `bin/sss-snake` to `$prefix/bin/sss-snake`;
+5. set executable mode `0755`;
+6. optionally create `$HOME/.local/state/sss-snake`;
+7. check whether `$prefix/bin` is in `PATH`;
+8. print a clear `PATH` hint when needed;
+9. print:
+
+   ```text
+   Installed SSS Snake to $HOME/.local/bin
+   Run: sss
+   ```
+
+The installer must not modify `.bashrc`, `.profile`, or `.zshrc`.
+
+The installer must not call `sudo` for its own installation. If a custom prefix such as `/usr/local` needs administrator permissions, the user runs:
+
+```bash
+sudo ./install.sh --prefix /usr/local
+```
+
+Update command:
+
+```bash
+cd "$HOME/src/sss-snake" && \
+git pull && \
+./install.sh
+```
+
+Uninstall command:
+
+```bash
+./install.sh --uninstall
+```
+
+Custom prefix uninstall:
+
+```bash
+./install.sh --uninstall --prefix /usr/local
+```
+
+Uninstall must not remove the source checkout under `$HOME/src/sss-snake`.
+
+## 14. README Language Requirements
 
 The project must use a single bilingual `README.md`.
 
@@ -425,7 +533,7 @@ The README should include:
 
 - demo preview or real demo asset
 - short "Why?" explanation
-- install instructions
+- `Install / Установка` block with HTTPS install, SSH install, run, update, uninstall, and `PATH` note
 - quick start
 - controls
 - tmux behavior
@@ -434,7 +542,7 @@ The README should include:
 - recommended SSH keepalive
 - `sss --version` and `sss-snake --version`
 
-## 14. Release Files
+## 15. Release Files
 
 The repository should include:
 
@@ -442,7 +550,7 @@ The repository should include:
 - GitHub Actions workflow with Bash syntax check and ShellCheck
 - `.gitignore` for local editor and virtual environment files
 
-## 15. Acceptance Criteria
+## 16. Acceptance Criteria
 
 The utility is ready when:
 
@@ -470,3 +578,9 @@ The utility is ready when:
 22. `sss-snake --help` documents game behavior.
 23. README is a single bilingual file with English first and Russian second.
 24. CI checks Bash syntax and ShellCheck.
+25. README contains HTTPS and SSH GitHub install commands.
+26. README contains an update command based on `git pull`.
+27. README contains an uninstall command.
+28. `install.sh` creates `$HOME/.local/bin` when needed.
+29. `install.sh` prints a clear `PATH` hint instead of editing shell config.
+30. `install.sh` does not call `sudo` for its own installation.

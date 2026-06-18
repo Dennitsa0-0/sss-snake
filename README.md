@@ -5,6 +5,74 @@
   <a href="#russian">Русский</a>
 </p>
 
+## Install / Установка
+
+Quick HTTPS install and run:
+
+Use HTTPS if you just want to install SSS Snake.
+Use SSH if your GitHub SSH key is already configured.
+
+Используйте HTTPS для обычной установки.
+Используйте SSH только если на сервере уже настроен GitHub SSH-ключ.
+
+```bash
+mkdir -p "$HOME/src" && \
+git clone https://github.com/Dennitsa0-0/sss-snake.git "$HOME/src/sss-snake" && \
+cd "$HOME/src/sss-snake" && \
+./install.sh && \
+export PATH="$HOME/.local/bin:$PATH" && \
+sss
+```
+
+SSH install, if you already have a GitHub SSH key configured:
+
+```bash
+mkdir -p "$HOME/src" && \
+git clone git@github.com:Dennitsa0-0/sss-snake.git "$HOME/src/sss-snake" && \
+cd "$HOME/src/sss-snake" && \
+./install.sh
+```
+
+Repository URLs:
+
+```text
+HTTPS: https://github.com/Dennitsa0-0/sss-snake.git
+SSH:   git@github.com:Dennitsa0-0/sss-snake.git
+```
+
+Run after install:
+
+```bash
+sss
+```
+
+If `sss` is not found yet:
+
+```bash
+"$HOME/.local/bin/sss"
+```
+
+Add this line to your shell profile for future terminals:
+
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+Update:
+
+```bash
+cd "$HOME/src/sss-snake" && \
+git pull && \
+./install.sh
+```
+
+Uninstall:
+
+```bash
+cd "$HOME/src/sss-snake" && \
+./install.sh --uninstall
+```
+
 <a id="english"></a>
 
 ## English
@@ -42,15 +110,74 @@ Leave your SSH terminal open. The snake plays itself, keeps the screen alive, an
 ### Requirements
 
 - Bash 4+
+- `git` for GitHub install
 - A POSIX-like terminal
 - Standard terminal tools such as `tput`, `stty`, `date`, and `hostname`
 - `tmux` is recommended, but optional
 
-### Install
+Install `git` first if it is missing:
 
-Install for the current user:
+Debian/Ubuntu:
 
 ```bash
+sudo apt install git
+```
+
+Fedora:
+
+```bash
+sudo dnf install git
+```
+
+Arch:
+
+```bash
+sudo pacman -S git
+```
+
+### Install
+
+HTTPS install, recommended for normal installation:
+
+```bash
+mkdir -p "$HOME/src" && \
+git clone https://github.com/Dennitsa0-0/sss-snake.git "$HOME/src/sss-snake" && \
+cd "$HOME/src/sss-snake" && \
+./install.sh
+```
+
+SSH install, only if your GitHub SSH key is already configured:
+
+```bash
+mkdir -p "$HOME/src" && \
+git clone git@github.com:Dennitsa0-0/sss-snake.git "$HOME/src/sss-snake" && \
+cd "$HOME/src/sss-snake" && \
+./install.sh
+```
+
+Run:
+
+```bash
+sss
+```
+
+If `sss` is not found yet, run it directly:
+
+```bash
+"$HOME/.local/bin/sss"
+```
+
+Then add this line to your shell profile for future terminals:
+
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+Update:
+
+```bash
+cd "$HOME/src/sss-snake" && \
+git pull && \
 ./install.sh
 ```
 
@@ -60,22 +187,24 @@ Install to a custom prefix:
 ./install.sh --prefix /usr/local
 ```
 
-Or use Make:
+If that prefix requires administrator permissions, run the installer yourself with `sudo`:
 
 ```bash
-make install PREFIX="$HOME/.local"
+sudo ./install.sh --prefix /usr/local
 ```
 
-Make sure the install directory is in `PATH`, for example:
+The installer does not call `sudo` for its own installation.
 
-```bash
-export PATH="$HOME/.local/bin:$PATH"
-```
-
-Uninstall:
+Uninstall from the default prefix:
 
 ```bash
 ./install.sh --uninstall
+```
+
+Uninstall from a custom prefix:
+
+```bash
+./install.sh --uninstall --prefix /usr/local
 ```
 
 ### Quick Start
@@ -98,7 +227,7 @@ Run without tmux:
 sss --no-tmux
 ```
 
-Show launcher status:
+Show `sss` status:
 
 ```bash
 sss status
@@ -119,11 +248,11 @@ sss-snake
 
 ### tmux Behavior
 
-The `sss` launcher is designed for people who do not know or care what tmux is.
+You do not need to know tmux before running SSS Snake.
 
-When `tmux` is installed, `sss` starts or attaches to a session named `sss-snake`.
+If `tmux` is installed, `sss` starts or attaches to the `sss-snake` session automatically.
 
-When `tmux` is missing, `sss` explains why it is useful and asks before installing anything:
+If `tmux` is missing, `sss` briefly explains why it is useful and asks before installing anything:
 
 ```text
 tmux is not installed.
@@ -134,7 +263,7 @@ It keeps your terminal session alive on the server even if SSH disconnects.
 Install tmux now? [y/N]
 ```
 
-Pressing Enter means No. The launcher never installs packages or calls `sudo` silently.
+Pressing Enter means No. `sss` never installs packages or calls `sudo` silently.
 
 Supported package managers, checked in order:
 
@@ -142,7 +271,7 @@ Supported package managers, checked in order:
 apt, dnf, yum, pacman, zypper, apk, brew
 ```
 
-If installation fails, or if the user declines, SSS Snake runs directly in the current terminal.
+If installation fails, or if you choose not to install tmux, SSS Snake runs directly in the current terminal.
 
 ### Commands
 
@@ -158,7 +287,7 @@ sss-snake
 sss-snake --version
 ```
 
-Launcher options:
+`sss` options:
 
 | Option | Behavior |
 | --- | --- |
@@ -246,7 +375,7 @@ SSS Snake does not:
 - download third-party binaries
 - run `curl | bash`
 
-The only package installation attempted by the launcher is the `tmux` package, and only after explicit confirmation or `--install-tmux`.
+The only package installation `sss` can attempt is `tmux`, and only after explicit confirmation or `--install-tmux`.
 
 ### What SSS Snake Is Not
 
@@ -300,40 +429,101 @@ SSS Snake - маленькая самоиграющая змейка для до
 ### Требования
 
 - Bash 4+
+- `git` для установки из GitHub
 - POSIX-подобный терминал
 - Стандартные терминальные утилиты: `tput`, `stty`, `date`, `hostname`
 - `tmux` рекомендуется, но не обязателен
 
-### Установка
+Если `git` не установлен, сначала установите его:
 
-Для текущего пользователя:
+Debian/Ubuntu:
 
 ```bash
+sudo apt install git
+```
+
+Fedora:
+
+```bash
+sudo dnf install git
+```
+
+Arch:
+
+```bash
+sudo pacman -S git
+```
+
+### Установка
+
+Установка через HTTPS, рекомендуемый вариант для обычной установки:
+
+```bash
+mkdir -p "$HOME/src" && \
+git clone https://github.com/Dennitsa0-0/sss-snake.git "$HOME/src/sss-snake" && \
+cd "$HOME/src/sss-snake" && \
 ./install.sh
 ```
 
-С другим prefix:
+Установка через SSH, только если на сервере уже настроен GitHub SSH-ключ:
 
 ```bash
-./install.sh --prefix /usr/local
+mkdir -p "$HOME/src" && \
+git clone git@github.com:Dennitsa0-0/sss-snake.git "$HOME/src/sss-snake" && \
+cd "$HOME/src/sss-snake" && \
+./install.sh
 ```
 
-Через Make:
+Запуск:
 
 ```bash
-make install PREFIX="$HOME/.local"
+sss
 ```
 
-Убедитесь, что директория установки есть в `PATH`, например:
+Если `sss` пока не найден, запустите напрямую:
+
+```bash
+"$HOME/.local/bin/sss"
+```
+
+Потом добавьте эту строку в shell profile для будущих терминалов:
 
 ```bash
 export PATH="$HOME/.local/bin:$PATH"
 ```
 
-Удаление:
+Обновление:
+
+```bash
+cd "$HOME/src/sss-snake" && \
+git pull && \
+./install.sh
+```
+
+Установка в другой prefix:
+
+```bash
+./install.sh --prefix /usr/local
+```
+
+Если для prefix нужны права администратора, запустите установщик через `sudo` сами:
+
+```bash
+sudo ./install.sh --prefix /usr/local
+```
+
+Установщик не вызывает `sudo` для собственной установки.
+
+Удаление из prefix по умолчанию:
 
 ```bash
 ./install.sh --uninstall
+```
+
+Удаление из другого prefix:
+
+```bash
+./install.sh --uninstall --prefix /usr/local
 ```
 
 ### Быстрый старт
@@ -356,7 +546,7 @@ sss
 sss --no-tmux
 ```
 
-Показать статус launcher:
+Показать статус `sss`:
 
 ```bash
 sss status
@@ -377,9 +567,9 @@ sss-snake
 
 ### Поведение tmux
 
-`sss` сделан так, чтобы пользователю не нужно было заранее знать tmux.
+Вам не нужно заранее знать tmux, чтобы запустить SSS Snake.
 
-Если `tmux` установлен, `sss` запускает или подключает сессию `sss-snake`.
+Если `tmux` установлен, `sss` автоматически запускает или подключает сессию `sss-snake`.
 
 Если `tmux` не найден, `sss` коротко объясняет, зачем он нужен, и спрашивает перед установкой:
 
@@ -392,7 +582,7 @@ It keeps your terminal session alive on the server even if SSH disconnects.
 Install tmux now? [y/N]
 ```
 
-Enter означает No. Launcher не устанавливает пакеты и не вызывает `sudo` молча.
+Enter означает No. `sss` не устанавливает пакеты и не вызывает `sudo` молча.
 
 Поддерживаемые пакетные менеджеры, порядок проверки:
 
@@ -400,7 +590,7 @@ Enter означает No. Launcher не устанавливает пакеты
 apt, dnf, yum, pacman, zypper, apk, brew
 ```
 
-Если установка не удалась или пользователь отказался, SSS Snake запускается прямо в текущем терминале.
+Если установка не удалась или вы решили не устанавливать tmux, SSS Snake запускается прямо в текущем терминале.
 
 ### Команды
 
@@ -416,7 +606,7 @@ sss-snake
 sss-snake --version
 ```
 
-Флаги launcher:
+Флаги `sss`:
 
 | Флаг | Поведение |
 | --- | --- |
@@ -504,7 +694,7 @@ SSS Snake не делает этого:
 - не скачивает сторонние бинарники
 - не выполняет `curl | bash`
 
-Единственная установка пакета, которую может попробовать launcher, - это установка пакета `tmux`, только после явного подтверждения или флага `--install-tmux`.
+Единственный пакет, который может попробовать установить `sss`, - это `tmux`, и только после явного подтверждения или флага `--install-tmux`.
 
 ### Чем SSS Snake не является
 

@@ -12,10 +12,11 @@
 - Added color themes and `NO_COLOR` support.
 - Added persistent high score.
 - Added public GitHub-oriented documentation.
+- Added copy-paste GitHub install, update, and uninstall instructions.
 
 ## 0.1.0
 
 - Initial Bash snake.
 - Added autopilot mode.
 - Added manual controls with arrows and `W A S D`.
-- Added optional tmux launcher.
+- Added optional tmux support through `sss`.

@@ -9,7 +9,7 @@
 
 Quick HTTPS server install and run:
 
-Use HTTPS if you just want to install SSS Snake.
+HTTPS is the default installation path.
 Use SSH only if GitHub SSH access is already configured on this machine.
 
 Используйте HTTPS для обычной установки.
@@ -86,7 +86,7 @@ If `sss` is not found yet:
 "$HOME/.local/bin/sss"
 ```
 
-Add this line to your shell profile for future terminals:
+Add the local bin directory to the shell profile for future terminals:
 
 ```bash
 export PATH="$HOME/.local/bin:$PATH"
@@ -136,7 +136,7 @@ bash ./install.sh --uninstall --prefix /custom/path
 
 SSS Snake is a tiny self-playing terminal snake for long SSH sessions.
 
-Leave your SSH terminal open. The snake plays itself, keeps the screen alive, and lets you take control when you come back.
+SSS Snake keeps an SSH terminal visually active with a self-playing snake. Manual control is available at any time.
 
 ```text
  SSS Snake  mode:AUTO  host:server  load:0.08 0.03 0.01
@@ -160,8 +160,8 @@ Leave your SSH terminal open. The snake plays itself, keeps the screen alive, an
 - Fast safe autopilot for idle sessions
 - Manual play with arrows or `W A S D`
 - Several fruit types can appear at once: apple, pear, berry, and bonus
-- Walls are enabled by default; use `--wrap` only if you want classic wrap-around
-- `away ate` shows how many fruits the autopilot ate while you were away
+- Walls are enabled by default; `--wrap` enables classic wrap-around
+- `away ate` shows how many fruits the autopilot collected in AUTO mode
 - `--big-food` makes fruit easier to hit by using a larger collision area
 - Color themes with `NO_COLOR` support
 - Configurable board size
@@ -227,7 +227,7 @@ cd "$HOME/src/sss-snake" && \
 bash ./install.sh --user
 ```
 
-After a user install, add it to your current shell PATH and run:
+After a user install, add SSS Snake to the current shell PATH and run:
 
 ```bash
 export PATH="$HOME/.local/bin:$PATH"
@@ -258,7 +258,7 @@ If `sss` is not found yet, run it directly:
 "$HOME/.local/bin/sss"
 ```
 
-Then add this line to your shell profile for future terminals:
+Then add the local bin directory to the shell profile for future terminals:
 
 ```bash
 export PATH="$HOME/.local/bin:$PATH"
@@ -287,7 +287,7 @@ Install to a custom prefix:
 bash ./install.sh --prefix /opt/sss-snake
 ```
 
-If that prefix requires administrator permissions, run the installer yourself with `sudo`:
+When a prefix requires administrator permissions, run the installer with `sudo`:
 
 ```bash
 sudo bash ./install.sh --prefix /usr/local
@@ -354,7 +354,7 @@ sss-snake
 
 ### tmux Behavior
 
-You do not need to know tmux before running SSS Snake.
+No prior tmux knowledge is required before running SSS Snake.
 
 If `tmux` is installed, `sss` starts or attaches to the `sss-snake` session automatically.
 
@@ -364,7 +364,7 @@ If `tmux` is missing, `sss` briefly explains why it is useful and asks before in
 tmux is not installed.
 
 SSS Snake can work without tmux, but tmux is recommended.
-It keeps your terminal session alive on the server even if SSH disconnects.
+It keeps the terminal session alive on the server even if SSH disconnects.
 
 Install tmux now? [y/N]
 ```
@@ -377,7 +377,7 @@ Supported package managers, checked in order:
 apt, dnf, yum, pacman, zypper, apk, brew
 ```
 
-If installation fails, or if you choose not to install tmux, SSS Snake runs directly in the current terminal.
+If installation fails or tmux installation is skipped, SSS Snake runs directly in the current terminal.
 
 ### Commands
 
@@ -413,6 +413,10 @@ Game options:
 | `--no-wrap` | Use walls on board edges. This is the default. |
 | `--path-refresh N` | Rebuild the smart autopilot path at most every N ticks. Default: `10`. |
 | `--ai MODE` | Autopilot mode: `safe`, `smart`, or `dumb`. Default: `safe`. |
+| `--lookahead N` | Safe AI lookahead depth. Default: `1`. |
+| `--open-radius N` | Radius for local open-space scoring. Default: `2`. |
+| `--memory N` | Number of recent head positions used for loop detection. Default: `20`. |
+| `--emergency-after N` | Stale ticks before safe AI switches to open-space emergency movement. Default: `20`. |
 | `--max-ai-cells N` | Use greedy movement above this board area. Default: `1200`. |
 | `--max-ai-steps N` | Maximum BFS nodes per smart path rebuild. Default: `300`. |
 | `--idle-ticks N` | Return to autopilot after N idle ticks in manual mode. |
@@ -427,6 +431,7 @@ Examples:
 sss --theme ocean --width 60 --height 18
 sss --fruits 8 --big-food
 sss --ascii --width 60 --height 18
+sss --memory 20 --open-radius 2 --emergency-after 20
 sss --ai smart --path-refresh 15
 sss --ai dumb --width 80 --height 24
 sss --no-install --theme mono --ascii
@@ -435,8 +440,8 @@ sss-snake 0.20 --theme matrix
 
 By default, SSS Snake uses a fast safe autopilot.
 It prefers smooth movement over perfect pathfinding.
-Use `--ai smart` for heavier pathfinding, or `--ai dumb` for maximum smoothness.
-Smart AI can be heavier on large fields, so large boards fall back to fast greedy movement unless you raise the AI limits.
+`--ai smart` enables heavier pathfinding, and `--ai dumb` keeps movement maximally lightweight.
+Smart AI can be heavier on large fields, so large boards fall back to fast greedy movement unless AI limits are raised.
 
 ### Controls
 
@@ -461,6 +466,10 @@ Smart AI can be heavier on large fields, so large boards fall back to fast greed
 | `SSS_IDLE_TICKS` | Idle ticks before returning to autopilot |
 | `SSS_PATH_REFRESH` | Smart autopilot path refresh interval |
 | `SSS_AI` | Default AI mode: `safe`, `smart`, or `dumb` |
+| `SSS_LOOKAHEAD` | Safe AI lookahead depth |
+| `SSS_OPEN_RADIUS` | Safe AI open-space scoring radius |
+| `SSS_MEMORY` | Safe AI loop-detection memory length |
+| `SSS_EMERGENCY_AFTER` | Safe AI stale tick limit |
 | `SSS_MAX_AI_CELLS` | Default max board cells for smart BFS |
 | `SSS_MAX_AI_STEPS` | Default BFS node limit |
 | `SSS_THEME` | Default theme |
@@ -514,11 +523,13 @@ The only package installation `sss` can attempt is `tmux`, and only after explic
 
 ### Design
 
-By default, SSS Snake uses `--ai safe`: a fast greedy autopilot that moves toward the nearest fruit while avoiding walls, the snake body, and 180-degree turns. Smooth movement is preferred over perfect pathfinding.
+By default, SSS Snake uses `--ai safe`: a fast local autopilot that values survivable space over the shortest route to fruit. Each candidate move rejects walls, body collisions, 180-degree turns, and dead-end cells, then scores safe exits, local open area, distance to fruit, and recent head-position repeats.
+
+Emergency mode activates when AUTO movement stops making progress or repeats recent head positions. In that mode, safe AI ignores fruit distance and moves toward the most open local area until a healthier route appears.
 
 `--ai smart` keeps a cached path to fruit and rebuilds it only occasionally or when it becomes stale. It uses one limited BFS from the snake head and stops when it finds a reachable fruit hitbox. If the path is not ready or becomes unsafe, the snake keeps moving with the same fast safe-move logic. `--ai dumb` avoids BFS entirely and only tries to keep moving safely.
 
-By default, the board edges are walls. Hitting a wall or the snake body restarts the round while keeping the total score and high score. Manual mode starts when you press arrows or `W A S D`; `T` or `Space` returns to autopilot, and idle manual play returns automatically after `--idle-ticks`.
+By default, the board edges are walls. Hitting a wall or the snake body restarts the round while keeping the total score and high score. Manual mode starts from arrows or `W A S D`; `T` or `Space` returns to autopilot, and idle manual play returns automatically after `--idle-ticks`.
 
 [Back to top](#sss-snake)
 
@@ -530,7 +541,7 @@ By default, the board edges are walls. Hitting a wall or the snake body restarts
 
 SSS Snake - маленькая самоиграющая змейка для долгих SSH-сессий.
 
-Оставил SSH-сессию открытой - змейка сама играет, держит терминал живым и показывает, сколько яблок собрала, пока тебя не было. Вернулся - взял управление.
+SSS Snake keeps an SSH terminal visually active with a self-playing snake. Manual control is available at any time.
 
 ```text
  SSS Snake  mode:AUTO  host:server  load:0.08 0.03 0.01
@@ -754,7 +765,7 @@ sss-snake
 tmux is not installed.
 
 SSS Snake can work without tmux, but tmux is recommended.
-It keeps your terminal session alive on the server even if SSH disconnects.
+It keeps the terminal session alive on the server even if SSH disconnects.
 
 Install tmux now? [y/N]
 ```

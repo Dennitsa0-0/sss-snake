@@ -2,6 +2,9 @@
 
 ## 0.4.0
 
+- Added safer local move scoring for the default `--ai safe` autopilot.
+- Added safe-exit checks, open-area scoring, recent-position memory, and emergency movement.
+- Added `--lookahead`, `--open-radius`, `--memory`, and `--emergency-after`.
 - Changed the default installer prefix to `/usr/local` for root and `$HOME/.local` for regular users.
 - Added explicit `--user`, `--system`, and `--prefix PATH` installer modes.
 - Added mode-aware uninstall commands without removing source checkouts or high scores.

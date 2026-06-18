@@ -31,6 +31,10 @@ Game options:
   --no-wrap        Keep edges as walls.
   --path-refresh N Rebuild autopilot path every N ticks.
   --ai MODE        Autopilot mode: safe, smart, dumb.
+  --lookahead N    Safe AI lookahead depth.
+  --open-radius N  Radius for local open-space scoring.
+  --memory N       Head positions remembered for loop detection.
+  --emergency-after N Stale ticks before emergency mode.
   --max-ai-cells N Use greedy AI above this board area.
   --max-ai-steps N Maximum BFS nodes per path rebuild.
   --idle-ticks N   Ticks before manual mode returns to autopilot.

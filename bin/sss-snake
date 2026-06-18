@@ -1,0 +1,655 @@
+#!/usr/bin/env bash
+set -u
+
+if (( BASH_VERSINFO[0] < 4 )); then
+  echo "SSS Snake requires Bash 4+ because it uses associative arrays." >&2
+  exit 1
+fi
+
+VERSION='0.2.0'
+
+show_help() {
+  cat <<'HELP'
+SSS Snake - a terminal snake that can idle safely in SSH sessions.
+
+Usage:
+  sss-snake [delay] [options]
+  sss-snake --help
+
+Arguments:
+  delay              Frame delay in seconds. Default: 0.12
+
+Options:
+  --width N          Board width, 20..100. Default: terminal-aware
+  --height N         Board height, 10..40. Default: terminal-aware
+  --idle-ticks N     Ticks before manual mode returns to autopilot
+  --theme NAME       classic, matrix, ocean, ember, mono
+  --ascii            Use ASCII symbols
+  --unicode          Use Unicode border and pieces
+  --no-score         Do not read or write the high score file
+  --help             Show this help
+  --version          Show version
+
+Controls:
+  Arrow keys         Play manually
+  W A S D            Play manually
+  T or Space         Toggle auto/manual mode
+  R                  Restart board
+  Q                  Quit
+
+Environment:
+  SSS_WIDTH          Default board width
+  SSS_HEIGHT         Default board height
+  SSS_IDLE_TICKS     Default idle ticks, 160
+  SSS_THEME          Default theme
+  SSS_ASCII=1        Use ASCII symbols
+  SSS_NO_SCORE=1     Disable high score persistence
+  NO_COLOR=1         Disable color output
+HELP
+}
+
+die() {
+  echo "sss-snake: $*" >&2
+  exit 2
+}
+
+is_uint() {
+  [[ "$1" =~ ^[0-9]+$ ]]
+}
+
+clamp() {
+  local value="$1" min="$2" max="$3"
+  (( value < min )) && value="$min"
+  (( value > max )) && value="$max"
+  printf '%s\n' "$value"
+}
+
+DELAY='0.12'
+WIDTH_ARG=''
+HEIGHT_ARG=''
+IDLE_TICKS="${SSS_IDLE_TICKS:-160}"
+THEME="${SSS_THEME:-classic}"
+USE_ASCII="${SSS_ASCII:-0}"
+SCORE_ENABLED=1
+delay_seen=0
+
+[[ -n "${SSS_NO_SCORE:-}" ]] && SCORE_ENABLED=0
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -h|--help|help)
+      show_help
+      exit 0
+      ;;
+    --version)
+      echo "SSS Snake $VERSION"
+      exit 0
+      ;;
+    --width)
+      [[ $# -ge 2 ]] || die "--width requires a value"
+      is_uint "$2" || die "--width must be a positive integer"
+      WIDTH_ARG="$2"
+      shift 2
+      ;;
+    --height)
+      [[ $# -ge 2 ]] || die "--height requires a value"
+      is_uint "$2" || die "--height must be a positive integer"
+      HEIGHT_ARG="$2"
+      shift 2
+      ;;
+    --idle-ticks)
+      [[ $# -ge 2 ]] || die "--idle-ticks requires a value"
+      is_uint "$2" || die "--idle-ticks must be a positive integer"
+      IDLE_TICKS="$2"
+      shift 2
+      ;;
+    --theme)
+      [[ $# -ge 2 ]] || die "--theme requires a value"
+      THEME="$2"
+      shift 2
+      ;;
+    --ascii)
+      USE_ASCII=1
+      shift
+      ;;
+    --unicode)
+      USE_ASCII=0
+      shift
+      ;;
+    --no-score)
+      SCORE_ENABLED=0
+      shift
+      ;;
+    --)
+      shift
+      break
+      ;;
+    -*)
+      die "unknown option: $1"
+      ;;
+    *)
+      if (( delay_seen == 1 )); then
+        die "unexpected argument: $1"
+      fi
+      DELAY="$1"
+      delay_seen=1
+      shift
+      ;;
+  esac
+done
+
+[[ "$DELAY" =~ ^([0-9]+([.][0-9]+)?|[.][0-9]+)$ ]] || die "delay must be a number"
+
+is_uint "$IDLE_TICKS" || die "SSS_IDLE_TICKS must be a positive integer"
+(( IDLE_TICKS < 1 )) && IDLE_TICKS=1
+
+cols="$(tput cols 2>/dev/null || echo 80)"
+lines="$(tput lines 2>/dev/null || echo 24)"
+
+term_w=$((cols - 2))
+term_h=$((lines - 7))
+
+W="${WIDTH_ARG:-${SSS_WIDTH:-$term_w}}"
+H="${HEIGHT_ARG:-${SSS_HEIGHT:-$term_h}}"
+
+is_uint "$W" || die "width must be a positive integer"
+is_uint "$H" || die "height must be a positive integer"
+
+W="$(clamp "$W" 20 100)"
+H="$(clamp "$H" 10 40)"
+
+if (( cols < W + 2 || lines < H + 7 )); then
+  echo "Terminal is too small. Need at least $((W + 2))x$((H + 7)); got ${cols}x${lines}." >&2
+  exit 1
+fi
+
+if [[ "$USE_ASCII" == "1" ]]; then
+  TL='+'; TR='+'; BL='+'; BR='+'; HH='-'; VV='|'
+  HEAD='O'; BODY='o'; APPLE='*'; EMPTY=' '
+else
+  TL=$'\u250c'; TR=$'\u2510'; BL=$'\u2514'; BR=$'\u2518'; HH=$'\u2500'; VV=$'\u2502'
+  HEAD=$'\u25c6'; BODY=$'\u25aa'; APPLE=$'\u25cf'; EMPTY=' '
+fi
+
+COLOR_RESET=''
+COLOR_BORDER=''
+COLOR_HEAD=''
+COLOR_BODY=''
+COLOR_APPLE=''
+COLOR_ACCENT=''
+
+setup_colors() {
+  local colors
+  [[ -n "${NO_COLOR:-}" ]] && return 0
+  colors="$(tput colors 2>/dev/null || echo 0)"
+  [[ "$colors" =~ ^[0-9]+$ ]] || colors=0
+  (( colors >= 8 )) || return 0
+
+  COLOR_RESET="$(tput sgr0 2>/dev/null || true)"
+
+  case "$THEME" in
+    classic)
+      COLOR_BORDER="$(tput setaf 6 2>/dev/null || true)"
+      COLOR_HEAD="$(tput setaf 2 2>/dev/null || true)"
+      COLOR_BODY="$(tput setaf 10 2>/dev/null || tput setaf 2 2>/dev/null || true)"
+      COLOR_APPLE="$(tput setaf 1 2>/dev/null || true)"
+      COLOR_ACCENT="$(tput setaf 3 2>/dev/null || true)"
+      ;;
+    matrix)
+      COLOR_BORDER="$(tput setaf 2 2>/dev/null || true)"
+      COLOR_HEAD="$(tput setaf 15 2>/dev/null || true)"
+      COLOR_BODY="$(tput setaf 10 2>/dev/null || tput setaf 2 2>/dev/null || true)"
+      COLOR_APPLE="$(tput setaf 11 2>/dev/null || tput setaf 3 2>/dev/null || true)"
+      COLOR_ACCENT="$(tput setaf 10 2>/dev/null || tput setaf 2 2>/dev/null || true)"
+      ;;
+    ocean)
+      COLOR_BORDER="$(tput setaf 4 2>/dev/null || true)"
+      COLOR_HEAD="$(tput setaf 14 2>/dev/null || tput setaf 6 2>/dev/null || true)"
+      COLOR_BODY="$(tput setaf 6 2>/dev/null || true)"
+      COLOR_APPLE="$(tput setaf 13 2>/dev/null || tput setaf 5 2>/dev/null || true)"
+      COLOR_ACCENT="$(tput setaf 12 2>/dev/null || tput setaf 4 2>/dev/null || true)"
+      ;;
+    ember)
+      COLOR_BORDER="$(tput setaf 3 2>/dev/null || true)"
+      COLOR_HEAD="$(tput setaf 11 2>/dev/null || tput setaf 3 2>/dev/null || true)"
+      COLOR_BODY="$(tput setaf 9 2>/dev/null || tput setaf 1 2>/dev/null || true)"
+      COLOR_APPLE="$(tput setaf 15 2>/dev/null || true)"
+      COLOR_ACCENT="$(tput setaf 1 2>/dev/null || true)"
+      ;;
+    mono)
+      ;;
+    *)
+      echo "Unknown theme '$THEME'; using classic." >&2
+      THEME='classic'
+      COLOR_BORDER="$(tput setaf 6 2>/dev/null || true)"
+      COLOR_HEAD="$(tput setaf 2 2>/dev/null || true)"
+      COLOR_BODY="$(tput setaf 2 2>/dev/null || true)"
+      COLOR_APPLE="$(tput setaf 1 2>/dev/null || true)"
+      COLOR_ACCENT="$(tput setaf 3 2>/dev/null || true)"
+      ;;
+  esac
+}
+
+colorize() {
+  local color="$1" text="$2"
+  if [[ -n "$color" ]]; then
+    printf '%s%s%s' "$color" "$text" "$COLOR_RESET"
+  else
+    printf '%s' "$text"
+  fi
+}
+
+state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/sss-snake"
+score_file="$state_dir/high-score"
+high_score=0
+
+load_high_score() {
+  local value
+  (( SCORE_ENABLED == 1 )) || return 0
+  [[ -r "$score_file" ]] || return 0
+  value="$(head -n 1 "$score_file" 2>/dev/null || true)"
+  if [[ "$value" =~ ^[0-9]+$ ]]; then
+    high_score="$value"
+  fi
+}
+
+save_high_score() {
+  (( SCORE_ENABLED == 1 )) || return 0
+  (( score_total > 0 )) || return 0
+  (( score_total >= high_score )) || return 0
+  mkdir -p "$state_dir" 2>/dev/null || return 0
+  printf '%s\n' "$score_total" >"$score_file" 2>/dev/null || true
+}
+
+declare -a path_x path_y body_x body_y
+declare -A path_index snake
+
+path_len=0
+score_total=0
+score_auto_away=0
+score_last_away=0
+score_manual=0
+crashes=0
+mode='auto'
+dir='RIGHT'
+manual_idle=0
+head_idx=0
+length=5
+apple_x=0
+apple_y=0
+old_stty=''
+
+build_path() {
+  local x y
+  path_len=0
+  path_x=()
+  path_y=()
+  path_index=()
+
+  for ((y=0; y<H; y++)); do
+    if (( y % 2 == 0 )); then
+      for ((x=0; x<W; x++)); do
+        path_x[$path_len]=$x
+        path_y[$path_len]=$y
+        path_index["$x,$y"]=$path_len
+        path_len=$((path_len + 1))
+      done
+    else
+      for ((x=W-1; x>=0; x--)); do
+        path_x[$path_len]=$x
+        path_y[$path_len]=$y
+        path_index["$x,$y"]=$path_len
+        path_len=$((path_len + 1))
+      done
+    fi
+  done
+}
+
+spawn_apple() {
+  local ax ay tries=0
+  while true; do
+    ax=$((RANDOM % W))
+    ay=$((RANDOM % H))
+
+    if [[ -z "${snake[$ax,$ay]+x}" ]]; then
+      apple_x=$ax
+      apple_y=$ay
+      return 0
+    fi
+
+    tries=$((tries + 1))
+    if (( tries > path_len * 2 )); then
+      apple_x=-1
+      apple_y=-1
+      return 1
+    fi
+  done
+}
+
+reset_board() {
+  local i idx x y
+  snake=()
+  body_x=()
+  body_y=()
+
+  length=5
+  head_idx=4
+  dir='RIGHT'
+  mode='auto'
+  manual_idle=0
+
+  for ((i=0; i<length; i++)); do
+    idx=$((head_idx - i))
+    (( idx < 0 )) && idx=$((idx + path_len))
+    x="${path_x[$idx]}"
+    y="${path_y[$idx]}"
+    body_x[$i]=$x
+    body_y[$i]=$y
+    snake["$x,$y"]=1
+  done
+
+  spawn_apple >/dev/null || true
+}
+
+normalize_for_auto() {
+  local keep_len hx hy i idx x y
+
+  hx="${body_x[0]:-0}"
+  hy="${body_y[0]:-0}"
+  head_idx="${path_index[$hx,$hy]:-0}"
+
+  keep_len=$length
+  (( keep_len < 5 )) && keep_len=5
+  (( keep_len > path_len - 2 )) && keep_len=$((path_len - 2))
+
+  snake=()
+  body_x=()
+  body_y=()
+  length=$keep_len
+
+  for ((i=0; i<length; i++)); do
+    idx=$((head_idx - i))
+    while (( idx < 0 )); do
+      idx=$((idx + path_len))
+    done
+    x="${path_x[$idx]}"
+    y="${path_y[$idx]}"
+    body_x[$i]=$x
+    body_y[$i]=$y
+    snake["$x,$y"]=1
+  done
+
+  if [[ -n "${snake[$apple_x,$apple_y]+x}" ]]; then
+    spawn_apple >/dev/null || true
+  fi
+}
+
+enter_manual() {
+  if [[ "$mode" != 'manual' ]]; then
+    score_last_away=$score_auto_away
+    score_auto_away=0
+  fi
+  mode='manual'
+  manual_idle=0
+}
+
+enter_auto() {
+  if [[ "$mode" != 'auto' ]]; then
+    normalize_for_auto
+  fi
+  mode='auto'
+  manual_idle=0
+}
+
+opposite_dir() {
+  local a="$1" b="$2"
+  [[ "$a" == 'UP' && "$b" == 'DOWN' ]] && return 0
+  [[ "$a" == 'DOWN' && "$b" == 'UP' ]] && return 0
+  [[ "$a" == 'LEFT' && "$b" == 'RIGHT' ]] && return 0
+  [[ "$a" == 'RIGHT' && "$b" == 'LEFT' ]] && return 0
+  return 1
+}
+
+set_direction() {
+  local new_dir="$1"
+  enter_manual
+  if ! opposite_dir "$dir" "$new_dir"; then
+    dir="$new_dir"
+  fi
+}
+
+on_eat() {
+  score_total=$((score_total + 1))
+  (( score_total > high_score )) && high_score=$score_total
+  if [[ "$mode" == 'auto' ]]; then
+    score_auto_away=$((score_auto_away + 1))
+  else
+    score_manual=$((score_manual + 1))
+  fi
+  spawn_apple >/dev/null || true
+}
+
+restart_keep_score() {
+  crashes=$((crashes + 1))
+  reset_board
+}
+
+move_to() {
+  local nx="$1" ny="$2" grow=0 tail_x tail_y i
+
+  if (( nx == apple_x && ny == apple_y )); then
+    grow=1
+  fi
+
+  if (( grow == 0 )); then
+    tail_x="${body_x[$((length - 1))]}"
+    tail_y="${body_y[$((length - 1))]}"
+    unset 'snake[$tail_x,$tail_y]'
+  fi
+
+  if [[ -n "${snake[$nx,$ny]+x}" ]]; then
+    restart_keep_score
+    return
+  fi
+
+  if (( grow == 1 )); then
+    length=$((length + 1))
+  fi
+
+  for ((i=length-1; i>0; i--)); do
+    body_x[$i]="${body_x[$((i - 1))]}"
+    body_y[$i]="${body_y[$((i - 1))]}"
+  done
+
+  body_x[0]=$nx
+  body_y[0]=$ny
+  snake["$nx,$ny"]=1
+
+  if (( grow == 1 )); then
+    on_eat
+  fi
+
+  if (( length >= path_len - 1 )); then
+    reset_board
+  fi
+}
+
+auto_step() {
+  local next_idx nx ny hx hy current_idx
+
+  hx="${body_x[0]}"
+  hy="${body_y[0]}"
+  current_idx="${path_index[$hx,$hy]:-$head_idx}"
+  next_idx=$(((current_idx + 1) % path_len))
+  head_idx=$next_idx
+
+  nx="${path_x[$next_idx]}"
+  ny="${path_y[$next_idx]}"
+  move_to "$nx" "$ny"
+}
+
+manual_step() {
+  local nx ny
+
+  nx="${body_x[0]}"
+  ny="${body_y[0]}"
+
+  case "$dir" in
+    UP)    ny=$(((ny - 1 + H) % H)) ;;
+    DOWN)  ny=$(((ny + 1) % H)) ;;
+    LEFT)  nx=$(((nx - 1 + W) % W)) ;;
+    RIGHT) nx=$(((nx + 1) % W)) ;;
+  esac
+
+  move_to "$nx" "$ny"
+}
+
+handle_key() {
+  local key="$1"
+
+  case "$key" in
+    $'\e[A'|w|W) set_direction 'UP' ;;
+    $'\e[B'|s|S) set_direction 'DOWN' ;;
+    $'\e[D'|a|A) set_direction 'LEFT' ;;
+    $'\e[C'|d|D) set_direction 'RIGHT' ;;
+    ' '|t|T)
+      if [[ "$mode" == 'auto' ]]; then
+        enter_manual
+      else
+        enter_auto
+      fi
+      ;;
+    r|R)
+      restart_keep_score
+      ;;
+    q|Q)
+      exit 0
+      ;;
+  esac
+}
+
+read_key() {
+  local first rest
+  first=''
+  rest=''
+
+  if ! IFS= read -rsn1 -t "$DELAY" first; then
+    return 1
+  fi
+
+  if [[ "$first" == $'\e' ]]; then
+    IFS= read -rsn2 -t 0.001 rest || true
+    printf '%s' "$first$rest"
+  else
+    printf '%s' "$first"
+  fi
+}
+
+draw_line() {
+  printf '\033[K%s\n' "$1"
+}
+
+draw() {
+  local x y key cell now host load mode_text away_text border line high_text
+
+  now="$(date '+%Y-%m-%d %H:%M:%S')"
+  host="$(hostname 2>/dev/null || echo unknown)"
+  load="$(cut -d' ' -f1-3 /proc/loadavg 2>/dev/null || echo '-')"
+  high_text="best:$high_score"
+  (( SCORE_ENABLED == 0 )) && high_text='best:off'
+
+  if [[ "$mode" == 'auto' ]]; then
+    mode_text='AUTO'
+    away_text="auto ate:$score_auto_away"
+  else
+    mode_text='PLAY'
+    away_text="away ate:$score_last_away"
+  fi
+
+  tput cup 0 0 2>/dev/null || printf '\033[H'
+  draw_line " $(colorize "$COLOR_ACCENT" 'SSS Snake')  mode:$mode_text  host:$host  load:$load  time:$now"
+  draw_line " total:$score_total  manual:$score_manual  $away_text  restarts:$crashes  $high_text"
+  draw_line " controls: arrows/WASD play | T/Space auto/manual | R restart | Q quit"
+
+  border="$TL"
+  for ((x=0; x<W; x++)); do border+="$HH"; done
+  border+="$TR"
+  draw_line "$(colorize "$COLOR_BORDER" "$border")"
+
+  for ((y=0; y<H; y++)); do
+    line="$(colorize "$COLOR_BORDER" "$VV")"
+    for ((x=0; x<W; x++)); do
+      key="$x,$y"
+
+      if (( x == apple_x && y == apple_y )); then
+        cell="$(colorize "$COLOR_APPLE" "$APPLE")"
+      elif (( x == body_x[0] && y == body_y[0] )); then
+        cell="$(colorize "$COLOR_HEAD" "$HEAD")"
+      elif [[ -n "${snake[$key]+x}" ]]; then
+        cell="$(colorize "$COLOR_BODY" "$BODY")"
+      else
+        cell="$EMPTY"
+      fi
+
+      line+="$cell"
+    done
+    line+="$(colorize "$COLOR_BORDER" "$VV")"
+    draw_line "$line"
+  done
+
+  border="$BL"
+  for ((x=0; x<W; x++)); do border+="$HH"; done
+  border+="$BR"
+  draw_line "$(colorize "$COLOR_BORDER" "$border")"
+  printf '\033[J'
+}
+
+cleanup() {
+  save_high_score
+  if [[ -n "$old_stty" ]]; then
+    stty "$old_stty" 2>/dev/null || true
+  else
+    stty sane 2>/dev/null || true
+  fi
+  tput cnorm 2>/dev/null || true
+  tput rmcup 2>/dev/null || true
+  printf '\n'
+}
+
+setup_colors
+load_high_score
+
+old_stty="$(stty -g 2>/dev/null || true)"
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
+tput smcup 2>/dev/null || true
+tput civis 2>/dev/null || true
+stty -echo -icanon time 0 min 0 2>/dev/null || true
+
+build_path
+reset_board
+clear
+
+while true; do
+  draw
+
+  key="$(read_key || true)"
+  if [[ -n "$key" ]]; then
+    handle_key "$key"
+  else
+    if [[ "$mode" == 'manual' ]]; then
+      manual_idle=$((manual_idle + 1))
+      if (( manual_idle >= IDLE_TICKS )); then
+        enter_auto
+      fi
+    fi
+  fi
+
+  if [[ "$mode" == 'auto' ]]; then
+    auto_step
+  else
+    manual_step
+  fi
+done

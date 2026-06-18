@@ -6,7 +6,7 @@ if (( BASH_VERSINFO[0] < 4 )); then
   exit 1
 fi
 
-VERSION='0.2.0'
+VERSION='0.3.0'
 
 show_help() {
   cat <<'HELP'
@@ -20,12 +20,17 @@ Arguments:
   delay              Frame delay in seconds. Default: 0.12
 
 Options:
-  --width N          Board width, 20..100. Default: terminal-aware
-  --height N         Board height, 10..40. Default: terminal-aware
+  --width N          Board width. Default: 60, capped by terminal
+  --height N         Board height. Default: 18, capped by terminal
+  --fruits N         Fruits on the board, 1..20. Default: 5
+  --big-food         Fruit hitboxes use radius 1
+  --wrap             Enable wrap-around edges
+  --no-wrap          Keep edges as walls. Default
+  --path-refresh N   Rebuild autopilot path every N ticks. Default: 5
   --idle-ticks N     Ticks before manual mode returns to autopilot
   --theme NAME       classic, matrix, ocean, ember, mono
-  --ascii            Use ASCII symbols
-  --unicode          Use Unicode border and pieces
+  --ascii            Force ASCII symbols
+  --unicode          Try Unicode; warn and fall back if UTF-8 is unavailable
   --no-score         Do not read or write the high score file
   --help             Show this help
   --version          Show version
@@ -40,7 +45,9 @@ Controls:
 Environment:
   SSS_WIDTH          Default board width
   SSS_HEIGHT         Default board height
+  SSS_FRUITS         Default fruit count, 5
   SSS_IDLE_TICKS     Default idle ticks, 160
+  SSS_PATH_REFRESH   Default path refresh ticks, 5
   SSS_THEME          Default theme
   SSS_ASCII=1        Use ASCII symbols
   SSS_NO_SCORE=1     Disable high score persistence
@@ -64,15 +71,37 @@ clamp() {
   printf '%s\n' "$value"
 }
 
+terminal_number() {
+  local cap="$1" fallback="$2" value
+  value="$(tput "$cap" 2>/dev/null || true)"
+  if [[ "$value" =~ ^[0-9]+$ && "$value" -gt 0 ]]; then
+    printf '%s\n' "$value"
+  else
+    printf '%s\n' "$fallback"
+  fi
+}
+
+utf8_available() {
+  local charmap locale_text
+  charmap="$(locale charmap 2>/dev/null || true)"
+  locale_text="${LC_ALL:-} ${LC_CTYPE:-} ${LANG:-} $charmap"
+  [[ "$locale_text" =~ ([Uu][Tt][Ff]-?8) ]]
+}
+
 DELAY='0.12'
 WIDTH_ARG=''
 HEIGHT_ARG=''
+FRUIT_TARGET="${SSS_FRUITS:-5}"
+BIG_FOOD=0
+WRAP=0
+PATH_REFRESH="${SSS_PATH_REFRESH:-5}"
 IDLE_TICKS="${SSS_IDLE_TICKS:-160}"
 THEME="${SSS_THEME:-classic}"
-USE_ASCII="${SSS_ASCII:-0}"
+UNICODE_MODE='auto'
 SCORE_ENABLED=1
 delay_seen=0
 
+[[ "${SSS_ASCII:-0}" == "1" ]] && UNICODE_MODE='ascii'
 [[ -n "${SSS_NO_SCORE:-}" ]] && SCORE_ENABLED=0
 
 while [[ $# -gt 0 ]]; do
@@ -97,6 +126,30 @@ while [[ $# -gt 0 ]]; do
       HEIGHT_ARG="$2"
       shift 2
       ;;
+    --fruits)
+      [[ $# -ge 2 ]] || die "--fruits requires a value"
+      is_uint "$2" || die "--fruits must be a positive integer"
+      FRUIT_TARGET="$2"
+      shift 2
+      ;;
+    --big-food)
+      BIG_FOOD=1
+      shift
+      ;;
+    --wrap)
+      WRAP=1
+      shift
+      ;;
+    --no-wrap)
+      WRAP=0
+      shift
+      ;;
+    --path-refresh)
+      [[ $# -ge 2 ]] || die "--path-refresh requires a value"
+      is_uint "$2" || die "--path-refresh must be a positive integer"
+      PATH_REFRESH="$2"
+      shift 2
+      ;;
     --idle-ticks)
       [[ $# -ge 2 ]] || die "--idle-ticks requires a value"
       is_uint "$2" || die "--idle-ticks must be a positive integer"
@@ -109,11 +162,11 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
     --ascii)
-      USE_ASCII=1
+      UNICODE_MODE='ascii'
       shift
       ;;
     --unicode)
-      USE_ASCII=0
+      UNICODE_MODE='unicode'
       shift
       ;;
     --no-score)
@@ -139,36 +192,53 @@ while [[ $# -gt 0 ]]; do
 done
 
 [[ "$DELAY" =~ ^([0-9]+([.][0-9]+)?|[.][0-9]+)$ ]] || die "delay must be a number"
-
-is_uint "$IDLE_TICKS" || die "SSS_IDLE_TICKS must be a positive integer"
+is_uint "$IDLE_TICKS" || die "idle ticks must be a positive integer"
+is_uint "$PATH_REFRESH" || die "path refresh must be a positive integer"
+is_uint "$FRUIT_TARGET" || die "fruit count must be a positive integer"
 (( IDLE_TICKS < 1 )) && IDLE_TICKS=1
+(( PATH_REFRESH < 1 )) && PATH_REFRESH=1
+FRUIT_TARGET="$(clamp "$FRUIT_TARGET" 1 20)"
 
-cols="$(tput cols 2>/dev/null || echo 80)"
-lines="$(tput lines 2>/dev/null || echo 24)"
+cols="$(terminal_number cols 80)"
+lines="$(terminal_number lines 24)"
 
-term_w=$((cols - 2))
-term_h=$((lines - 7))
+if (( cols < 24 || lines < 17 )); then
+  echo "Terminal is too small. Need at least 24x17." >&2
+  exit 1
+fi
 
-W="${WIDTH_ARG:-${SSS_WIDTH:-$term_w}}"
-H="${HEIGHT_ARG:-${SSS_HEIGHT:-$term_h}}"
+max_w=$((cols - 4))
+max_h=$((lines - 7))
+W="${WIDTH_ARG:-${SSS_WIDTH:-60}}"
+H="${HEIGHT_ARG:-${SSS_HEIGHT:-18}}"
 
 is_uint "$W" || die "width must be a positive integer"
 is_uint "$H" || die "height must be a positive integer"
 
-W="$(clamp "$W" 20 100)"
-H="$(clamp "$H" 10 40)"
+W="$(clamp "$W" 20 "$max_w")"
+H="$(clamp "$H" 10 "$max_h")"
 
-if (( cols < W + 2 || lines < H + 7 )); then
-  echo "Terminal is too small. Need at least $((W + 2))x$((H + 7)); got ${cols}x${lines}." >&2
-  exit 1
+USE_ASCII=0
+if [[ "$UNICODE_MODE" == 'ascii' ]]; then
+  USE_ASCII=1
+elif utf8_available; then
+  USE_ASCII=0
+else
+  USE_ASCII=1
+  if [[ "$UNICODE_MODE" == 'unicode' ]]; then
+    echo "Warning: UTF-8 locale is unavailable; using ASCII mode." >&2
+    sleep 1
+  fi
 fi
 
-if [[ "$USE_ASCII" == "1" ]]; then
+if (( USE_ASCII == 1 )); then
   TL='+'; TR='+'; BL='+'; BR='+'; HH='-'; VV='|'
-  HEAD='O'; BODY='o'; APPLE='*'; EMPTY=' '
+  HEAD='@'; BODY='o'; EMPTY=' '
+  APPLE_SYM='o'; PEAR_SYM='O'; BERRY_SYM='*'; BONUS_SYM='$'
 else
-  TL=$'\u250c'; TR=$'\u2510'; BL=$'\u2514'; BR=$'\u2518'; HH=$'\u2500'; VV=$'\u2502'
-  HEAD=$'\u25c6'; BODY=$'\u25aa'; APPLE=$'\u25cf'; EMPTY=' '
+  TL='┌'; TR='┐'; BL='└'; BR='┘'; HH='─'; VV='│'
+  HEAD='◆'; BODY='▪'; EMPTY=' '
+  APPLE_SYM='●'; PEAR_SYM='◉'; BERRY_SYM='•'; BONUS_SYM='◆'
 fi
 
 COLOR_RESET=''
@@ -261,144 +331,172 @@ save_high_score() {
   printf '%s\n' "$score_total" >"$score_file" 2>/dev/null || true
 }
 
-declare -a path_x path_y body_x body_y
-declare -A path_index snake
+declare -a body_x body_y fruit_x fruit_y fruit_type fruit_points fruit_grow fruit_radius auto_path bfs_result
+declare -A snake fruit_center fruit_hit fruit_symbol fruit_score fruit_growth bfs_targets
 
-path_len=0
 score_total=0
 score_auto_away=0
-score_last_away=0
 score_manual=0
-crashes=0
+restarts=0
 mode='auto'
 dir='RIGHT'
 manual_idle=0
-head_idx=0
 length=5
-apple_x=0
-apple_y=0
+growth_pending=0
+eat_grow=0
+fruit_count=0
+tick=0
+auto_path_pos=0
+path_dirty=1
 old_stty=''
 
-build_path() {
-  local x y
-  path_len=0
-  path_x=()
-  path_y=()
-  path_index=()
+fruit_symbol[apple]="$APPLE_SYM"; fruit_score[apple]=1; fruit_growth[apple]=1
+fruit_symbol[pear]="$PEAR_SYM"; fruit_score[pear]=2; fruit_growth[pear]=1
+fruit_symbol[berry]="$BERRY_SYM"; fruit_score[berry]=1; fruit_growth[berry]=0
+fruit_symbol[bonus]="$BONUS_SYM"; fruit_score[bonus]=5; fruit_growth[bonus]=2
 
-  for ((y=0; y<H; y++)); do
-    if (( y % 2 == 0 )); then
-      for ((x=0; x<W; x++)); do
-        path_x[$path_len]=$x
-        path_y[$path_len]=$y
-        path_index["$x,$y"]=$path_len
-        path_len=$((path_len + 1))
+fruit_kind_random() {
+  local r=$((RANDOM % 100))
+  if (( r < 50 )); then
+    printf 'apple\n'
+  elif (( r < 75 )); then
+    printf 'pear\n'
+  elif (( r < 92 )); then
+    printf 'berry\n'
+  else
+    printf 'bonus\n'
+  fi
+}
+
+rebuild_fruit_maps() {
+  local i x y r dx dy hx hy
+  fruit_center=()
+  fruit_hit=()
+  for ((i=0; i<fruit_count; i++)); do
+    [[ -n "${fruit_x[$i]+x}" ]] || continue
+    x="${fruit_x[$i]}"
+    y="${fruit_y[$i]}"
+    r="${fruit_radius[$i]}"
+    fruit_center["$x,$y"]="$i"
+    for ((dy=-r; dy<=r; dy++)); do
+      for ((dx=-r; dx<=r; dx++)); do
+        hx=$((x + dx))
+        hy=$((y + dy))
+        fruit_hit["$hx,$hy"]="$i"
       done
-    else
-      for ((x=W-1; x>=0; x--)); do
-        path_x[$path_len]=$x
-        path_y[$path_len]=$y
-        path_index["$x,$y"]=$path_len
-        path_len=$((path_len + 1))
-      done
-    fi
+    done
   done
 }
 
-spawn_apple() {
-  local ax ay tries=0
-  while true; do
-    ax=$((RANDOM % W))
-    ay=$((RANDOM % H))
+fruit_space_ok() {
+  local x="$1" y="$2" radius="$3" ignore="${4:--1}" dx dy hx hy idx
+  for ((dy=-radius; dy<=radius; dy++)); do
+    for ((dx=-radius; dx<=radius; dx++)); do
+      hx=$((x + dx))
+      hy=$((y + dy))
+      (( hx >= 0 && hx < W && hy >= 0 && hy < H )) || return 1
+      [[ -z "${snake[$hx,$hy]+x}" ]] || return 1
+      if [[ -n "${fruit_hit[$hx,$hy]+x}" ]]; then
+        idx="${fruit_hit[$hx,$hy]}"
+        (( idx == ignore )) || return 1
+      fi
+    done
+  done
+  return 0
+}
 
-    if [[ -z "${snake[$ax,$ay]+x}" ]]; then
-      apple_x=$ax
-      apple_y=$ay
+spawn_fruit() {
+  local slot="$1" tries=0 x y kind radius
+  radius=0
+  (( BIG_FOOD == 1 )) && radius=1
+  while true; do
+    x=$((RANDOM % W))
+    y=$((RANDOM % H))
+    if fruit_space_ok "$x" "$y" "$radius" "$slot"; then
+      kind="$(fruit_kind_random)"
+      fruit_x[$slot]="$x"
+      fruit_y[$slot]="$y"
+      fruit_type[$slot]="$kind"
+      fruit_points[$slot]="${fruit_score[$kind]}"
+      fruit_grow[$slot]="${fruit_growth[$kind]}"
+      fruit_radius[$slot]="$radius"
+      (( slot >= fruit_count )) && fruit_count=$((slot + 1))
+      rebuild_fruit_maps
+      path_dirty=1
       return 0
     fi
 
     tries=$((tries + 1))
-    if (( tries > path_len * 2 )); then
-      apple_x=-1
-      apple_y=-1
+    if (( tries > W * H * 3 )); then
       return 1
     fi
   done
 }
 
+fill_fruits() {
+  local i
+  rebuild_fruit_maps
+  for ((i=0; i<FRUIT_TARGET; i++)); do
+    [[ -n "${fruit_x[$i]+x}" ]] || spawn_fruit "$i" >/dev/null || true
+  done
+  rebuild_fruit_maps
+}
+
+active_fruit_count() {
+  local i count=0
+  for ((i=0; i<fruit_count; i++)); do
+    [[ -n "${fruit_x[$i]+x}" ]] && count=$((count + 1))
+  done
+  printf '%s\n' "$count"
+}
+
 reset_board() {
-  local i idx x y
+  local i x y start_x start_y
   snake=()
   body_x=()
   body_y=()
+  fruit_x=()
+  fruit_y=()
+  fruit_type=()
+  fruit_points=()
+  fruit_grow=()
+  fruit_radius=()
+  fruit_count=0
+  auto_path=()
+  auto_path_pos=0
+  path_dirty=1
 
   length=5
-  head_idx=4
+  growth_pending=0
   dir='RIGHT'
   mode='auto'
   manual_idle=0
 
+  start_x=$((W / 2))
+  start_y=$((H / 2))
+  (( start_x < length )) && start_x=$length
+
   for ((i=0; i<length; i++)); do
-    idx=$((head_idx - i))
-    (( idx < 0 )) && idx=$((idx + path_len))
-    x="${path_x[$idx]}"
-    y="${path_y[$idx]}"
+    x=$((start_x - i))
+    y=$start_y
     body_x[$i]=$x
     body_y[$i]=$y
     snake["$x,$y"]=1
   done
 
-  spawn_apple >/dev/null || true
-}
-
-normalize_for_auto() {
-  local keep_len hx hy i idx x y
-
-  hx="${body_x[0]:-0}"
-  hy="${body_y[0]:-0}"
-  head_idx="${path_index[$hx,$hy]:-0}"
-
-  keep_len=$length
-  (( keep_len < 5 )) && keep_len=5
-  (( keep_len > path_len - 2 )) && keep_len=$((path_len - 2))
-
-  snake=()
-  body_x=()
-  body_y=()
-  length=$keep_len
-
-  for ((i=0; i<length; i++)); do
-    idx=$((head_idx - i))
-    while (( idx < 0 )); do
-      idx=$((idx + path_len))
-    done
-    x="${path_x[$idx]}"
-    y="${path_y[$idx]}"
-    body_x[$i]=$x
-    body_y[$i]=$y
-    snake["$x,$y"]=1
-  done
-
-  if [[ -n "${snake[$apple_x,$apple_y]+x}" ]]; then
-    spawn_apple >/dev/null || true
-  fi
+  fill_fruits
 }
 
 enter_manual() {
-  if [[ "$mode" != 'manual' ]]; then
-    score_last_away=$score_auto_away
-    score_auto_away=0
-  fi
   mode='manual'
   manual_idle=0
+  path_dirty=1
 }
 
 enter_auto() {
-  if [[ "$mode" != 'auto' ]]; then
-    normalize_for_auto
-  fi
   mode='auto'
   manual_idle=0
+  path_dirty=1
 }
 
 opposite_dir() {
@@ -418,33 +516,99 @@ set_direction() {
   fi
 }
 
-on_eat() {
-  score_total=$((score_total + 1))
+next_coord() {
+  local d="$1" x="$2" y="$3" nx="$2" ny="$3"
+  case "$d" in
+    UP)    ny=$((ny - 1)) ;;
+    DOWN)  ny=$((ny + 1)) ;;
+    LEFT)  nx=$((nx - 1)) ;;
+    RIGHT) nx=$((nx + 1)) ;;
+  esac
+
+  if (( WRAP == 1 )); then
+    (( nx < 0 )) && nx=$((W - 1))
+    (( nx >= W )) && nx=0
+    (( ny < 0 )) && ny=$((H - 1))
+    (( ny >= H )) && ny=0
+  fi
+
+  printf '%s %s\n' "$nx" "$ny"
+}
+
+direction_to() {
+  local x="$1" y="$2" nx="$3" ny="$4"
+  if (( nx == x && ny == y - 1 )); then printf 'UP\n'; return; fi
+  if (( nx == x && ny == y + 1 )); then printf 'DOWN\n'; return; fi
+  if (( nx == x - 1 && ny == y )); then printf 'LEFT\n'; return; fi
+  if (( nx == x + 1 && ny == y )); then printf 'RIGHT\n'; return; fi
+  if (( WRAP == 1 )); then
+    if (( x == 0 && nx == W - 1 && ny == y )); then printf 'LEFT\n'; return; fi
+    if (( x == W - 1 && nx == 0 && ny == y )); then printf 'RIGHT\n'; return; fi
+    if (( y == 0 && ny == H - 1 && nx == x )); then printf 'UP\n'; return; fi
+    if (( y == H - 1 && ny == 0 && nx == x )); then printf 'DOWN\n'; return; fi
+  fi
+  printf '%s\n' "$dir"
+}
+
+safe_cell() {
+  local nx="$1" ny="$2" allow_tail="${3:-1}" tail_x tail_y
+  (( nx >= 0 && nx < W && ny >= 0 && ny < H )) || return 1
+  if [[ -n "${snake[$nx,$ny]+x}" ]]; then
+    if (( allow_tail == 1 && length > 0 )); then
+      tail_x="${body_x[$((length - 1))]}"
+      tail_y="${body_y[$((length - 1))]}"
+      (( nx == tail_x && ny == tail_y )) && return 0
+    fi
+    return 1
+  fi
+  return 0
+}
+
+restart_keep_score() {
+  restarts=$((restarts + 1))
+  reset_board
+}
+
+eat_fruit() {
+  local idx="$1" points grow
+  eat_grow=0
+  points="${fruit_points[$idx]:-1}"
+  grow="${fruit_grow[$idx]:-1}"
+  score_total=$((score_total + points))
   (( score_total > high_score )) && high_score=$score_total
   if [[ "$mode" == 'auto' ]]; then
     score_auto_away=$((score_auto_away + 1))
   else
-    score_manual=$((score_manual + 1))
+    score_manual=$((score_manual + points))
   fi
-  spawn_apple >/dev/null || true
-}
-
-restart_keep_score() {
-  crashes=$((crashes + 1))
-  reset_board
+  unset "fruit_x[$idx]" "fruit_y[$idx]" "fruit_type[$idx]" "fruit_points[$idx]" "fruit_grow[$idx]" "fruit_radius[$idx]"
+  spawn_fruit "$idx" >/dev/null || true
+  path_dirty=1
+  eat_grow="$grow"
 }
 
 move_to() {
-  local nx="$1" ny="$2" grow=0 tail_x tail_y i
+  local nx="$1" ny="$2" fruit_idx='' grow=0 grow_add=0 remove_tail=1 had_pending=0 tail_x tail_y i
 
-  if (( nx == apple_x && ny == apple_y )); then
-    grow=1
+  if (( nx < 0 || nx >= W || ny < 0 || ny >= H )); then
+    restart_keep_score
+    return
   fi
 
-  if (( grow == 0 )); then
+  if [[ -n "${fruit_hit[$nx,$ny]+x}" ]]; then
+    fruit_idx="${fruit_hit[$nx,$ny]}"
+    grow="${fruit_grow[$fruit_idx]:-1}"
+  fi
+
+  (( growth_pending > 0 )) && had_pending=1
+  if (( had_pending == 1 || grow > 0 )); then
+    remove_tail=0
+  fi
+
+  if (( remove_tail == 1 )); then
     tail_x="${body_x[$((length - 1))]}"
     tail_y="${body_y[$((length - 1))]}"
-    unset 'snake[$tail_x,$tail_y]'
+    unset "snake[$tail_x,$tail_y]"
   fi
 
   if [[ -n "${snake[$nx,$ny]+x}" ]]; then
@@ -452,7 +616,7 @@ move_to() {
     return
   fi
 
-  if (( grow == 1 )); then
+  if (( remove_tail == 0 )); then
     length=$((length + 1))
   fi
 
@@ -465,42 +629,184 @@ move_to() {
   body_y[0]=$ny
   snake["$nx,$ny"]=1
 
-  if (( grow == 1 )); then
-    on_eat
+  if [[ -n "$fruit_idx" ]]; then
+    eat_fruit "$fruit_idx"
+    grow_add="$eat_grow"
+    if (( had_pending == 1 )); then
+      growth_pending=$((growth_pending - 1))
+    fi
+    if (( grow_add > 1 )); then
+      growth_pending=$((growth_pending + grow_add - 1))
+    fi
+  elif (( had_pending == 1 )); then
+    growth_pending=$((growth_pending - 1))
   fi
 
-  if (( length >= path_len - 1 )); then
+  if (( length >= W * H - 1 )); then
     reset_board
   fi
 }
 
+bfs_to_targets() {
+  local start_x="${body_x[0]}" start_y="${body_y[0]}"
+  local -a qx qy rev
+  local -A seen parent
+  local head=0 tail=0 x y nx ny key nkey found='' d prev cx cy px py i
+
+  bfs_result=()
+  qx[$tail]=$start_x; qy[$tail]=$start_y; tail=$((tail + 1))
+  seen["$start_x,$start_y"]=1
+
+  while (( head < tail )); do
+    x="${qx[$head]}"
+    y="${qy[$head]}"
+    head=$((head + 1))
+    key="$x,$y"
+
+    if [[ -n "${bfs_targets[$key]+x}" && "$key" != "$start_x,$start_y" ]]; then
+      found="$key"
+      break
+    fi
+
+    for d in UP DOWN LEFT RIGHT; do
+      read -r nx ny < <(next_coord "$d" "$x" "$y")
+      nkey="$nx,$ny"
+      [[ -n "${seen[$nkey]+x}" ]] && continue
+      safe_cell "$nx" "$ny" 1 || continue
+      seen["$nkey"]=1
+      parent["$nkey"]="$key"
+      qx[$tail]=$nx
+      qy[$tail]=$ny
+      tail=$((tail + 1))
+    done
+  done
+
+  [[ -n "$found" ]] || return 1
+
+  cx="${found%,*}"
+  cy="${found#*,}"
+  while [[ "$cx,$cy" != "$start_x,$start_y" ]]; do
+    prev="${parent[$cx,$cy]}"
+    px="${prev%,*}"
+    py="${prev#*,}"
+    rev+=("$(direction_to "$px" "$py" "$cx" "$cy")")
+    cx="$px"
+    cy="$py"
+  done
+
+  for ((i=${#rev[@]}-1; i>=0; i--)); do
+    bfs_result+=("${rev[$i]}")
+  done
+  (( ${#bfs_result[@]} > 0 ))
+}
+
+build_food_path() {
+  local i x y r dx dy hx hy key d best_len=-1
+  local -a candidate best
+
+  for ((i=0; i<fruit_count; i++)); do
+    [[ -n "${fruit_x[$i]+x}" ]] || continue
+    bfs_targets=()
+    x="${fruit_x[$i]}"; y="${fruit_y[$i]}"; r="${fruit_radius[$i]}"
+    for ((dy=-r; dy<=r; dy++)); do
+      for ((dx=-r; dx<=r; dx++)); do
+        hx=$((x + dx)); hy=$((y + dy))
+        (( hx >= 0 && hx < W && hy >= 0 && hy < H )) || continue
+        bfs_targets["$hx,$hy"]=1
+      done
+    done
+    if bfs_to_targets; then
+      candidate=("${bfs_result[@]}")
+      d="${#candidate[@]}"
+      if (( best_len < 0 || d < best_len )); then
+        best_len=$d
+        best=("${candidate[@]}")
+      fi
+    fi
+  done
+
+  if (( best_len >= 0 )); then
+    auto_path=("${best[@]}")
+    auto_path_pos=0
+    return 0
+  fi
+  return 1
+}
+
+build_tail_path() {
+  local tail_x tail_y
+  tail_x="${body_x[$((length - 1))]}"
+  tail_y="${body_y[$((length - 1))]}"
+  bfs_targets=()
+  bfs_targets["$tail_x,$tail_y"]=1
+  if bfs_to_targets; then
+    auto_path=("${bfs_result[@]}")
+    auto_path_pos=0
+    return 0
+  fi
+  auto_path_pos=0
+  return 1
+}
+
+choose_safe_direction() {
+  local d nx ny
+  for d in "$dir" UP RIGHT DOWN LEFT; do
+    opposite_dir "$dir" "$d" && continue
+    read -r nx ny < <(next_coord "$d" "${body_x[0]}" "${body_y[0]}")
+    if safe_cell "$nx" "$ny" 1; then
+      printf '%s\n' "$d"
+      return 0
+    fi
+  done
+  return 1
+}
+
+rebuild_auto_path() {
+  auto_path=()
+  auto_path_pos=0
+  if build_food_path; then
+    path_dirty=0
+    return 0
+  fi
+  if build_tail_path; then
+    path_dirty=0
+    return 0
+  fi
+  path_dirty=0
+  return 1
+}
+
 auto_step() {
-  local next_idx nx ny hx hy current_idx
+  local d nx ny
+  tick=$((tick + 1))
+  if (( path_dirty == 1 || tick % PATH_REFRESH == 0 || auto_path_pos >= ${#auto_path[@]} )); then
+    rebuild_auto_path || true
+  fi
 
-  hx="${body_x[0]}"
-  hy="${body_y[0]}"
-  current_idx="${path_index[$hx,$hy]:-$head_idx}"
-  next_idx=$(((current_idx + 1) % path_len))
-  head_idx=$next_idx
+  if (( auto_path_pos < ${#auto_path[@]} )); then
+    d="${auto_path[$auto_path_pos]}"
+    read -r nx ny < <(next_coord "$d" "${body_x[0]}" "${body_y[0]}")
+    if safe_cell "$nx" "$ny" 1 || [[ -n "${fruit_hit[$nx,$ny]+x}" ]]; then
+      dir="$d"
+      auto_path_pos=$((auto_path_pos + 1))
+      move_to "$nx" "$ny"
+      return
+    fi
+    path_dirty=1
+  fi
 
-  nx="${path_x[$next_idx]}"
-  ny="${path_y[$next_idx]}"
-  move_to "$nx" "$ny"
+  if d="$(choose_safe_direction)"; then
+    dir="$d"
+    read -r nx ny < <(next_coord "$dir" "${body_x[0]}" "${body_y[0]}")
+    move_to "$nx" "$ny"
+  else
+    restart_keep_score
+  fi
 }
 
 manual_step() {
   local nx ny
-
-  nx="${body_x[0]}"
-  ny="${body_y[0]}"
-
-  case "$dir" in
-    UP)    ny=$(((ny - 1 + H) % H)) ;;
-    DOWN)  ny=$(((ny + 1) % H)) ;;
-    LEFT)  nx=$(((nx - 1 + W) % W)) ;;
-    RIGHT) nx=$(((nx + 1) % W)) ;;
-  esac
-
+  read -r nx ny < <(next_coord "$dir" "${body_x[0]}" "${body_y[0]}")
   move_to "$nx" "$ny"
 }
 
@@ -550,25 +856,19 @@ draw_line() {
 }
 
 draw() {
-  local x y key cell now host load mode_text away_text border line high_text
+  local x y key cell now host load mode_text border line high_text idx type sym fruits_text
 
   now="$(date '+%Y-%m-%d %H:%M:%S')"
   host="$(hostname 2>/dev/null || echo unknown)"
   load="$(cut -d' ' -f1-3 /proc/loadavg 2>/dev/null || echo '-')"
   high_text="best:$high_score"
   (( SCORE_ENABLED == 0 )) && high_text='best:off'
-
-  if [[ "$mode" == 'auto' ]]; then
-    mode_text='AUTO'
-    away_text="auto ate:$score_auto_away"
-  else
-    mode_text='PLAY'
-    away_text="away ate:$score_last_away"
-  fi
+  [[ "$mode" == 'auto' ]] && mode_text='AUTO' || mode_text='PLAY'
+  fruits_text="$(active_fruit_count)"
 
   tput cup 0 0 2>/dev/null || printf '\033[H'
   draw_line " $(colorize "$COLOR_ACCENT" 'SSS Snake')  mode:$mode_text  host:$host  load:$load  time:$now"
-  draw_line " total:$score_total  manual:$score_manual  $away_text  restarts:$crashes  $high_text"
+  draw_line " total:$score_total  manual:$score_manual  away ate:$score_auto_away  restarts:$restarts  $high_text  fruits:$fruits_text"
   draw_line " controls: arrows/WASD play | T/Space auto/manual | R restart | Q quit"
 
   border="$TL"
@@ -581,12 +881,15 @@ draw() {
     for ((x=0; x<W; x++)); do
       key="$x,$y"
 
-      if (( x == apple_x && y == apple_y )); then
-        cell="$(colorize "$COLOR_APPLE" "$APPLE")"
-      elif (( x == body_x[0] && y == body_y[0] )); then
+      if (( x == body_x[0] && y == body_y[0] )); then
         cell="$(colorize "$COLOR_HEAD" "$HEAD")"
       elif [[ -n "${snake[$key]+x}" ]]; then
         cell="$(colorize "$COLOR_BODY" "$BODY")"
+      elif [[ -n "${fruit_center[$key]+x}" ]]; then
+        idx="${fruit_center[$key]}"
+        type="${fruit_type[$idx]}"
+        sym="${fruit_symbol[$type]}"
+        cell="$(colorize "$COLOR_APPLE" "$sym")"
       else
         cell="$EMPTY"
       fi
@@ -628,7 +931,6 @@ tput smcup 2>/dev/null || true
 tput civis 2>/dev/null || true
 stty -echo -icanon time 0 min 0 2>/dev/null || true
 
-build_path
 reset_board
 clear
 

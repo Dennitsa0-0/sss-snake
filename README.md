@@ -83,12 +83,12 @@ Leave your SSH terminal open. The snake plays itself, keeps the screen alive, an
 
 ```text
  SSS Snake  mode:AUTO  host:server  load:0.08 0.03 0.01
- total:42  manual:3  auto ate:12  restarts:0  best:87
+ total:42  manual:3  away ate:12  restarts:0  best:87  fruits:5
  controls: arrows/WASD play | T/Space auto/manual | R restart | Q quit
  +----------------------------+
- | Ooo        *               |
+ | @oo     o    O       *     |
  |                            |
- |                            |
+ |            $               |
  |                            |
  +----------------------------+
 ```
@@ -100,8 +100,12 @@ Leave your SSH terminal open. The snake plays itself, keeps the screen alive, an
 - One-command launch with `sss`
 - Safe first-run tmux bootstrap
 - Works without tmux when tmux is unavailable
-- Autopilot mode for idle sessions
+- Autopilot mode for idle sessions: the snake uses BFS to seek reachable fruit
 - Manual play with arrows or `W A S D`
+- Several fruit types can appear at once: apple, pear, berry, and bonus
+- Walls are enabled by default; use `--wrap` only if you want classic wrap-around
+- `away ate` shows how many fruits the autopilot ate while you were away
+- `--big-food` makes fruit easier to hit by using a larger collision area
 - Color themes with `NO_COLOR` support
 - Configurable board size
 - Persistent high score
@@ -299,18 +303,25 @@ Game options:
 
 | Option | Behavior |
 | --- | --- |
-| `--width N` | Set board width, clamped to `20..100`. |
-| `--height N` | Set board height, clamped to `10..40`. |
+| `--width N` | Set board width. It is capped by the terminal width. |
+| `--height N` | Set board height. It is capped by the terminal height. |
+| `--fruits N` | Set how many fruits are on the board, clamped to `1..20`. Default: `5`. |
+| `--big-food` | Make fruit count as eaten within a 3x3 hitbox. |
+| `--wrap` | Enable wrap-around edges. |
+| `--no-wrap` | Use walls on board edges. This is the default. |
+| `--path-refresh N` | Rebuild the autopilot BFS path every N ticks. Default: `5`. |
 | `--idle-ticks N` | Return to autopilot after N idle ticks in manual mode. |
 | `--theme NAME` | Use `classic`, `matrix`, `ocean`, `ember`, or `mono`. |
-| `--ascii` | Use ASCII board symbols. |
-| `--unicode` | Use Unicode board symbols. |
+| `--ascii` | Use ASCII board and food symbols. Useful when Unicode renders badly. |
+| `--unicode` | Try Unicode symbols; falls back to ASCII if UTF-8 is unavailable. |
 | `--no-score` | Do not read or write the high score file. |
 
 Examples:
 
 ```bash
 sss --theme ocean --width 60 --height 18
+sss --fruits 8 --big-food
+sss --ascii --width 60 --height 18
 sss --no-install --theme mono --ascii
 sss-snake 0.20 --theme matrix
 ```
@@ -334,7 +345,9 @@ sss-snake 0.20 --theme matrix
 | `SSS_NO_INSTALL_PROMPT=1` | Do not ask to install tmux |
 | `SSS_WIDTH` | Default board width |
 | `SSS_HEIGHT` | Default board height |
+| `SSS_FRUITS` | Default fruit count |
 | `SSS_IDLE_TICKS` | Idle ticks before returning to autopilot |
+| `SSS_PATH_REFRESH` | Autopilot BFS refresh interval |
 | `SSS_THEME` | Default theme |
 | `SSS_ASCII=1` | Use ASCII symbols |
 | `SSS_NO_SCORE=1` | Disable high score persistence |
@@ -386,7 +399,9 @@ The only package installation `sss` can attempt is `tmux`, and only after explic
 
 ### Design
 
-Autopilot follows a deterministic route over the whole board. It eventually reaches every apple while avoiding self-collisions. Manual mode behaves like a regular snake with wrap-around edges. If manual mode is left idle, the game normalizes the snake back onto the safe autopilot route and continues.
+Autopilot searches for the nearest reachable fruit with BFS. It respects walls, the snake body, fruit hitboxes, and the current wrap setting. If no fruit path is available, it tries to follow its tail, then chooses any safe non-reversing move.
+
+By default, the board edges are walls. Hitting a wall or the snake body restarts the round while keeping the total score and high score. Manual mode starts when you press arrows or `W A S D`; `T` or `Space` returns to autopilot, and idle manual play returns automatically after `--idle-ticks`.
 
 [Back to top](#sss-snake)
 
@@ -402,12 +417,12 @@ SSS Snake - маленькая самоиграющая змейка для до
 
 ```text
  SSS Snake  mode:AUTO  host:server  load:0.08 0.03 0.01
- total:42  manual:3  auto ate:12  restarts:0  best:87
+ total:42  manual:3  away ate:12  restarts:0  best:87  fruits:5
  controls: arrows/WASD play | T/Space auto/manual | R restart | Q quit
  +----------------------------+
- | Ooo        *               |
+ | @oo     o    O       *     |
  |                            |
- |                            |
+ |            $               |
  |                            |
  +----------------------------+
 ```

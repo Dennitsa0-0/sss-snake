@@ -4,12 +4,12 @@ SSS Snake is intentionally small. It has two executable Bash scripts and no runt
 
 ## `bin/sss`
 
-`sss` is the launcher.
+`sss` is the main entrypoint.
 
 Responsibilities:
 
-- parse launcher commands such as `snake` and `status`
-- parse launcher flags such as `--no-tmux`, `--no-install`, and `--install-tmux`
+- parse `sss` commands such as `snake` and `status`
+- parse `sss` flags such as `--no-tmux`, `--no-install`, and `--install-tmux`
 - pass game flags through to `sss-snake`
 - detect whether the process is already inside tmux
 - detect whether `tmux` is installed
@@ -19,7 +19,7 @@ Responsibilities:
 
 The default tmux session name is `sss-snake` and can be changed with `SSS_TMUX_SESSION`.
 
-The launcher does not modify shell startup files, add autostart, upgrade the system, remove packages, download binaries, or run `curl | bash`.
+`sss` does not modify shell startup files, add autostart, upgrade the system, remove packages, download binaries, or run `curl | bash`.
 
 ## tmux Bootstrap
 
@@ -31,7 +31,7 @@ Supported package managers are checked in this order:
 apt, dnf, yum, pacman, zypper, apk, brew
 ```
 
-For non-root Linux package managers, the launcher uses `sudo` only after printing a short warning. If `sudo` is unavailable or installation fails, `sss` runs the game directly.
+For non-root Linux package managers, `sss` uses `sudo` only after printing a short warning. If `sudo` is unavailable or installation fails, `sss` runs the game directly.
 
 ## `bin/sss-snake`
 
@@ -58,7 +58,7 @@ The game uses a simple loop:
 2. Read one key with a timeout equal to the frame delay.
 3. Apply manual input if present.
 4. Step autopilot or manual movement.
-5. Repeat until the user quits.
+5. Repeat until quit is requested.
 
 `trap cleanup EXIT INT TERM` restores terminal state and writes the high score when needed.
 
@@ -82,7 +82,7 @@ No curses library is required.
 
 ## Persistence
 
-The high score is stored in the user state directory:
+The high score is stored in the XDG state directory:
 
 ```text
 $XDG_STATE_HOME/sss-snake/high-score

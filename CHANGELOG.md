@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.0
+
+- Added terminal-capped board sizing with a clear small-terminal error.
+- Added automatic UTF-8 detection, `--ascii`, and safer Unicode rendering.
+- Added wall edges by default, with optional `--wrap`.
+- Added multiple fruit types, `--fruits`, and `--big-food` hitboxes.
+- Replaced route-following autopilot with BFS fruit seeking plus tail/safe-move fallback.
+- Added `away ate`, fruit count display, and new CLI documentation.
+
 ## 0.2.0
 
 - Added safe first-run tmux bootstrap.

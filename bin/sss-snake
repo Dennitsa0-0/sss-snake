@@ -13,21 +13,29 @@ show_help() {
 SSS Snake - a terminal snake that can idle safely in SSH sessions.
 
 Usage:
-  sss-snake [delay] [options]
+  sss-snake [idle|watch|game] [options]
+  sss-snake game [delay] [options]
+  sss-snake --game [options]
   sss-snake --help
 
 Arguments:
-  delay              Frame delay in seconds. Default: 0.12
+  idle              Low CPU SSH activity screen. Default
+  watch             Minimal activity screen
+  game              Playable snake mode
+  delay             Game frame delay in seconds. Default: 0.20
 
 Options:
+  --fps N           Frames per second. idle/watch default: 0.2, range: 0.2..1; game default: 5, max: 10
   --width N          Board width. Default: 50, capped by terminal
   --height N         Board height. Default: 16, capped by terminal
   --fruits N         Fruits on the board, 1..20. Default: 4
   --big-food         Fruit hitboxes use radius 1
+  --debug-hitbox     Draw fruit hitboxes for debugging
+  --debug-ai         Show autopilot target and decision debug info
   --wrap             Enable wrap-around edges
   --no-wrap          Keep edges as walls. Default
   --path-refresh N   Rebuild smart autopilot path every N ticks. Default: 10
-  --ai MODE          Autopilot mode: safe, smart, dumb. Default: safe
+  --ai MODE          Autopilot mode: safe, smart, dumb. Default: dumb
   --lookahead N      Safe AI lookahead depth. Default: 1
   --open-radius N    Radius for local open-space scoring. Default: 2
   --memory N         Head positions remembered for loop detection. Default: 20
@@ -43,6 +51,12 @@ Options:
   --version          Show version
 
 Controls:
+  Idle/watch mode:
+  G or Enter        Start game mode
+  T                 Show tmux detach hint
+  Q                 Quit
+
+  Game mode:
   Arrow keys         Play manually
   W A S D            Play manually
   T or Space         Toggle auto/manual mode
@@ -55,7 +69,8 @@ Environment:
   SSS_FRUITS         Default fruit count, 4
   SSS_IDLE_TICKS     Default idle ticks, 160
   SSS_PATH_REFRESH   Default path refresh ticks, 10
-  SSS_AI             Default AI mode: safe, smart, dumb
+  SSS_FPS            Default frames per second, capped at 10
+  SSS_AI             Default AI mode in game: safe, smart, dumb
   SSS_LOOKAHEAD      Safe AI lookahead depth, 1
   SSS_OPEN_RADIUS    Safe AI open-space radius, 2
   SSS_MEMORY         Safe AI memory length, 20
@@ -102,14 +117,53 @@ utf8_available() {
   [[ "$locale_text" =~ ([Uu][Tt][Ff]-?8) ]]
 }
 
-DELAY='0.12'
+fps_to_delay() {
+  case "$1" in
+    0.2|.2) printf '5' ;;
+    0.25|.25) printf '4' ;;
+    0.5|.5) printf '2' ;;
+    1) printf '1' ;;
+    2) printf '0.5' ;;
+    3) printf '0.333' ;;
+    4) printf '0.25' ;;
+    5) printf '0.2' ;;
+    6) printf '0.167' ;;
+    7) printf '0.143' ;;
+    8) printf '0.125' ;;
+    9) printf '0.111' ;;
+    10) printf '0.1' ;;
+  esac
+}
+
+clamp_fps() {
+  local fps="$1"
+  case "$fps" in
+    .2) fps='0.2' ;;
+    .25) fps='0.25' ;;
+    .5) fps='0.5' ;;
+  esac
+
+  case "$fps" in
+    0.2|0.25|0.5|1|2|3|4|5|6|7|8|9|10)
+      printf '%s\n' "$fps"
+      ;;
+    *)
+      die "fps must be one of: 0.2, 0.25, 0.5, 1..10"
+      ;;
+  esac
+}
+RUN_MODE='idle'
+FPS_ARG=''
+DELAY=''
 WIDTH_ARG=''
 HEIGHT_ARG=''
 FRUIT_TARGET="${SSS_FRUITS:-4}"
 BIG_FOOD=0
+DEBUG_HITBOX=0
+DEBUG_AI=0
 WRAP=0
 PATH_REFRESH="${SSS_PATH_REFRESH:-10}"
-AI_MODE="${SSS_AI:-safe}"
+AI_MODE="${SSS_AI:-dumb}"
 LOOKAHEAD="${SSS_LOOKAHEAD:-1}"
 OPEN_RADIUS="${SSS_OPEN_RADIUS:-2}"
 MEMORY="${SSS_MEMORY:-20}"
@@ -135,6 +189,15 @@ while [[ $# -gt 0 ]]; do
       echo "SSS Snake $VERSION"
       exit 0
       ;;
+    --game)
+      RUN_MODE='game'
+      shift
+      ;;
+    --fps)
+      [[ $# -ge 2 ]] || die "--fps requires a value"
+      FPS_ARG="$2"
+      shift 2
+      ;;
     --width)
       [[ $# -ge 2 ]] || die "--width requires a value"
       is_uint "$2" || die "--width must be a positive integer"
@@ -155,6 +218,14 @@ while [[ $# -gt 0 ]]; do
       ;;
     --big-food)
       BIG_FOOD=1
+      shift
+      ;;
+    --debug-hitbox)
+      DEBUG_HITBOX=1
+      shift
+      ;;
+    --debug-ai)
+      DEBUG_AI=1
       shift
       ;;
     --wrap)
@@ -243,15 +314,60 @@ while [[ $# -gt 0 ]]; do
       die "unknown option: $1"
       ;;
     *)
-      if (( delay_seen == 1 )); then
-        die "unexpected argument: $1"
-      fi
-      DELAY="$1"
-      delay_seen=1
-      shift
+      case "$1" in
+        idle|watch)
+          RUN_MODE="$1"
+          shift
+          ;;
+        game|snake)
+          RUN_MODE='game'
+          shift
+          ;;
+        *)
+          if [[ "$RUN_MODE" != 'game' ]]; then
+            die "unexpected argument in $RUN_MODE mode: $1"
+          fi
+          if (( delay_seen == 1 )); then
+            die "unexpected argument: $1"
+          fi
+          DELAY="$1"
+          delay_seen=1
+          shift
+          ;;
+      esac
       ;;
   esac
 done
+
+if [[ -n "$FPS_ARG" ]]; then
+  FPS_ARG="$(clamp_fps "$FPS_ARG")"
+fi
+
+if [[ -z "$DELAY" ]]; then
+  if [[ -n "$FPS_ARG" ]]; then
+    DELAY="$(fps_to_delay "$FPS_ARG")"
+  elif [[ -n "${SSS_FPS:-}" ]]; then
+    FPS_ARG="$(clamp_fps "${SSS_FPS}")"
+    DELAY="$(fps_to_delay "$FPS_ARG")"
+  elif [[ "$RUN_MODE" == 'game' ]]; then
+    DELAY='0.2'
+  else
+    FPS_ARG='0.2'
+    DELAY='5'
+  fi
+elif [[ "$RUN_MODE" != 'game' ]]; then
+  die "delay is only supported in game mode; use --fps for idle/watch"
+fi
+
+if [[ "$RUN_MODE" != 'game' ]]; then
+  case "$FPS_ARG" in
+    ''|0.2|0.25|0.5|1) ;;
+    *)
+      FPS_ARG='1'
+      DELAY='1'
+      ;;
+  esac
+fi
 
 [[ "$DELAY" =~ ^([0-9]+([.][0-9]+)?|[.][0-9]+)$ ]] || die "delay must be a number"
 is_uint "$IDLE_TICKS" || die "idle ticks must be a positive integer"
@@ -281,8 +397,18 @@ esac
 cols="$(terminal_number cols 80)"
 lines="$(terminal_number lines 24)"
 
-if (( cols < 24 || lines < 17 )); then
-  echo "Terminal is too small. Need at least 24x17." >&2
+if (( cols < 24 )); then
+  echo "Terminal is too small. Need at least 24 columns." >&2
+  exit 1
+fi
+
+if [[ "$RUN_MODE" == 'game' ]]; then
+  if (( lines < 17 )); then
+    echo "Terminal is too small. Need at least 24x17 for game mode." >&2
+    exit 1
+  fi
+elif (( lines < 8 )); then
+  echo "Terminal is too small. Need at least 24x8 for idle/watch mode." >&2
   exit 1
 fi
 
@@ -312,7 +438,7 @@ fi
 
 if (( USE_ASCII == 1 )); then
   TL='+'; TR='+'; BL='+'; BR='+'; HH='-'; VV='|'
-  HEAD='@'; BODY='o'; EMPTY=' '
+  HEAD='@'; BODY='#'; EMPTY=' '
   APPLE_SYM='o'; PEAR_SYM='O'; BERRY_SYM='*'; BONUS_SYM='$'
 else
   TL='┌'; TR='┐'; BL='└'; BR='┘'; HH='─'; VV='│'
@@ -471,6 +597,28 @@ rebuild_fruit_maps() {
   done
 }
 
+fruit_at() {
+  local x="$1" y="$2" i fx fy radius dx dy
+  for ((i=0; i<fruit_count; i++)); do
+    [[ -n "${fruit_x[$i]+x}" ]] || continue
+    fx="${fruit_x[$i]}"
+    fy="${fruit_y[$i]}"
+    radius="${fruit_radius[$i]:-0}"
+    dx=$(( x > fx ? x - fx : fx - x ))
+    dy=$(( y > fy ? y - fy : fy - y ))
+    if (( dx <= radius && dy <= radius )); then
+      printf '%s\n' "$i"
+      return 0
+    fi
+  done
+  return 1
+}
+
+fruit_exists() {
+  local idx="$1"
+  [[ "$idx" =~ ^[0-9]+$ ]] || return 1
+  [[ -n "${fruit_x[$idx]+x}" ]]
+}
 fruit_space_ok() {
   local x="$1" y="$2" radius="$3" ignore="${4:--1}" dx dy hx hy idx
   for ((dy=-radius; dy<=radius; dy++)); do
@@ -677,6 +825,12 @@ eat_fruit() {
   else
     score_manual=$((score_manual + points))
   fi
+  if (( target_fruit_id == idx )); then
+    target_fruit_id=-1
+    target_x=''
+    target_y=''
+    target_age=0
+  fi
   unset "fruit_x[$idx]" "fruit_y[$idx]" "fruit_type[$idx]" "fruit_points[$idx]" "fruit_grow[$idx]" "fruit_radius[$idx]"
   spawn_fruit "$idx" >/dev/null || true
   path_dirty=1
@@ -691,9 +845,10 @@ move_to() {
     return
   fi
 
-  if [[ -n "${fruit_hit[$nx,$ny]+x}" ]]; then
-    fruit_idx="${fruit_hit[$nx,$ny]}"
+  if fruit_idx="$(fruit_at "$nx" "$ny")"; then
     grow="${fruit_grow[$fruit_idx]:-1}"
+  else
+    fruit_idx=''
   fi
 
   (( growth_pending > 0 )) && had_pending=1
@@ -736,6 +891,15 @@ move_to() {
     fi
   elif (( had_pending == 1 )); then
     growth_pending=$((growth_pending - 1))
+  fi
+
+  if (( DEBUG_AI == 1 )); then
+    local bug_idx
+    if bug_idx="$(fruit_at "${body_x[0]}" "${body_y[0]}")"; then
+      AI_BUG="head is inside fruit hitbox but fruit was not eaten id=$bug_idx"
+    else
+      AI_BUG=''
+    fi
   fi
 
   if (( length >= W * H - 1 )); then
@@ -807,8 +971,7 @@ food_distance_from() {
 
 move_growth_at() {
   local x="$1" y="$2" idx
-  if [[ -n "${fruit_hit[$x,$y]+x}" ]]; then
-    idx="${fruit_hit[$x,$y]}"
+  if idx="$(fruit_at "$x" "$y")"; then
     printf '%s\n' "${fruit_grow[$idx]:-0}"
   else
     printf '0\n'
@@ -931,10 +1094,68 @@ try_direction_list() {
   return 1
 }
 
+target_valid() {
+  fruit_exists "$target_fruit_id"
+}
+
+choose_target() {
+  local i hx="${body_x[0]}" hy="${body_y[0]}" fx fy radius dx dy dist best=-1 best_id=-1
+  if target_valid; then
+    target_x="${fruit_x[$target_fruit_id]}"
+    target_y="${fruit_y[$target_fruit_id]}"
+    target_age=$((target_age + 1))
+    return 0
+  fi
+
+  for ((i=0; i<fruit_count; i++)); do
+    [[ -n "${fruit_x[$i]+x}" ]] || continue
+    fx="${fruit_x[$i]}"
+    fy="${fruit_y[$i]}"
+    radius="${fruit_radius[$i]:-0}"
+    dx=$(( hx > fx ? hx - fx : fx - hx ))
+    dy=$(( hy > fy ? hy - fy : fy - hy ))
+    dx=$(( dx > radius ? dx - radius : 0 ))
+    dy=$(( dy > radius ? dy - radius : 0 ))
+    dist=$((dx + dy))
+    if (( best < 0 || dist < best )); then
+      best="$dist"
+      best_id="$i"
+    fi
+  done
+
+  if (( best_id >= 0 )); then
+    target_fruit_id="$best_id"
+    target_x="${fruit_x[$best_id]}"
+    target_y="${fruit_y[$best_id]}"
+    target_age=0
+    return 0
+  fi
+
+  target_fruit_id=-1
+  target_x=''
+  target_y=''
+  target_age=0
+  return 1
+}
+
+target_distance_from() {
+  local x="$1" y="$2" fx fy radius dx dy
+  choose_target || return 1
+  fx="$target_x"
+  fy="$target_y"
+  radius="${fruit_radius[$target_fruit_id]:-0}"
+  dx=$(( x > fx ? x - fx : fx - x ))
+  dy=$(( y > fy ? y - fy : fy - y ))
+  dx=$(( dx > radius ? dx - radius : 0 ))
+  dy=$(( dy > radius ? dy - radius : 0 ))
+  printf '%s\n' $((dx + dy))
+}
 choose_safe_direction() {
   local d nx ny grow exits open dist repeats score best='' best_score=-999999 best_dist=999999 best_open=-1
   local fallback='' fallback_score=-999999 eating_zero='' candidates=0 good_candidates=0 emergency_candidate=0
   local seen=''
+
+  choose_target >/dev/null 2>&1 || true
 
   for d in "$dir" UP RIGHT DOWN LEFT; do
     [[ -n "$d" ]] || continue
@@ -948,7 +1169,7 @@ choose_safe_direction() {
     grow="$(move_growth_at "$nx" "$ny")"
     exits="$(safe_exits_after_move "$nx" "$ny")"
     open="$(open_area_after_move "$nx" "$ny")"
-    dist="$(food_distance_from "$nx" "$ny" || printf '999')"
+    dist="$(target_distance_from "$nx" "$ny" || food_distance_from "$nx" "$ny" || printf '999')"
     repeats="$(recent_position_hits "$nx" "$ny")"
 
     if (( exits == 0 && grow > 0 )); then
@@ -960,7 +1181,12 @@ choose_safe_direction() {
       emergency_candidate=1
     else
       score=$((exits * 10 - dist))
-      (( repeats > 0 )) && score=$((score - repeats * 8))
+      [[ "$d" == "$dir" ]] && score=$((score + 3))
+      [[ "$d" != "$dir" ]] && score=$((score - 2))
+      if [[ "$last_auto_dir" == 'UP' && "$d" == 'DOWN' || "$last_auto_dir" == 'DOWN' && "$d" == 'UP' ]]; then
+        score=$((score - 20))
+      fi
+      (( repeats > 0 )) && score=$((score - repeats * 10))
       (( exits <= 1 )) && score=$((score - 6))
       (( exits >= 3 )) && score=$((score + 4))
       (( open <= OPEN_RADIUS + 1 )) && score=$((score - 8))
@@ -1036,7 +1262,7 @@ build_smart_path() {
     steps=$((steps + 1))
     key="$x,$y"
 
-    if [[ -n "${fruit_hit[$key]+x}" && "$key" != "$start_x,$start_y" ]]; then
+    if [[ "$key" != "$start_x,$start_y" ]] && fruit_at "$x" "$y" >/dev/null; then
       found="$key"
       break
     fi
@@ -1146,10 +1372,15 @@ auto_step() {
 
   if [[ -n "$d" ]]; then
     dir="$d"
+    AI_NEXT="$d"
+    AI_REASON="target-distance"
     read -r nx ny < <(next_coord "$dir" "${body_x[0]}" "${body_y[0]}")
+    last_auto_dir="$dir"
     move_to "$nx" "$ny"
     update_ai_progress
   else
+    AI_NEXT="none"
+    AI_REASON="no-safe-move"
     restart_keep_score
   fi
 }
@@ -1193,7 +1424,9 @@ read_key() {
     return 1
   fi
 
-  if [[ "$first" == $'\e' ]]; then
+  if [[ -z "$first" ]]; then
+    printf 'ENTER'
+  elif [[ "$first" == $'\e' ]]; then
     IFS= read -rsn2 -t 0.001 rest || true
     printf '%s' "$first$rest"
   else
@@ -1205,21 +1438,44 @@ draw_line() {
   printf '\033[K%s\n' "$1"
 }
 
-draw() {
-  local x y key cell now host load mode_text border line high_text idx type sym fruits_text
+STATUS_HOST='unknown'
+STATUS_TIME=''
+STATUS_LOAD='-'
+STATUS_FRUITS='0'
+STATUS_SECOND=-1
 
-  now="$(date '+%Y-%m-%d %H:%M:%S')"
-  host="$(hostname 2>/dev/null || echo unknown)"
-  load="$(cut -d' ' -f1-3 /proc/loadavg 2>/dev/null || echo '-')"
+refresh_status() {
+  local force="${1:-0}" second
+  second="$SECONDS"
+  if (( force == 1 || second != STATUS_SECOND )); then
+    STATUS_SECOND="$second"
+    STATUS_TIME="$(date '+%Y-%m-%d %H:%M:%S')"
+    STATUS_LOAD="$(cut -d' ' -f1-3 /proc/loadavg 2>/dev/null || echo '-')"
+    if [[ "$RUN_MODE" == 'game' ]]; then
+      STATUS_FRUITS="$(active_fruit_count)"
+    fi
+  fi
+}
+draw() {
+  local x y key cell mode_text border line high_text idx type sym
+
+  refresh_status 0
   high_text="best:$high_score"
   (( SCORE_ENABLED == 0 )) && high_text='best:off'
   [[ "$mode" == 'auto' ]] && mode_text='AUTO' || mode_text='PLAY'
-  fruits_text="$(active_fruit_count)"
 
   tput cup 0 0 2>/dev/null || printf '\033[H'
-  draw_line " $(colorize "$COLOR_ACCENT" 'SSS Snake')  mode:$mode_text  host:$host  load:$load  time:$now"
-  draw_line " total:$score_total  manual:$score_manual  away ate:$score_auto_away  restarts:$restarts  $high_text  fruits:$fruits_text"
+  draw_line " $(colorize "$COLOR_ACCENT" 'SSS Snake')  mode:$mode_text  host:$STATUS_HOST  load:$STATUS_LOAD  time:$STATUS_TIME"
+  draw_line " total:$score_total  manual:$score_manual  away ate:$score_auto_away  restarts:$restarts  $high_text  fruits:$STATUS_FRUITS"
   draw_line " controls: arrows/WASD play | T/Space auto/manual | R restart | Q quit"
+  if (( DEBUG_AI == 1 )); then
+    if fruit_exists "$target_fruit_id"; then
+      draw_line " target:id=$target_fruit_id type:${fruit_type[$target_fruit_id]} x:$target_x y:$target_y age:$target_age next:$AI_NEXT reason:$AI_REASON"
+    else
+      draw_line " target:none next:$AI_NEXT reason:$AI_REASON"
+    fi
+    [[ -n "$AI_BUG" ]] && draw_line " BUG: $AI_BUG"
+  fi
 
   border="$TL"
   for ((x=0; x<W; x++)); do border+="$HH"; done
@@ -1240,6 +1496,8 @@ draw() {
         type="${fruit_type[$idx]}"
         sym="${fruit_symbol[$type]}"
         cell="$(colorize "$COLOR_APPLE" "$sym")"
+      elif (( DEBUG_HITBOX == 1 )) && fruit_at "$x" "$y" >/dev/null; then
+        cell="$(colorize "$COLOR_ACCENT" '.')"
       else
         cell="$EMPTY"
       fi
@@ -1257,6 +1515,87 @@ draw() {
   printf '\033[J'
 }
 
+draw_activity() {
+  local label="$1" frame snake pad hint load_text fps_text
+  refresh_status 0
+  frame=$((SECONDS % 6 + 1))
+  pad='      '
+  snake="@${pad:0:$frame}----"
+  load_text="$STATUS_LOAD"
+  fps_text="${FPS_ARG:-1}"
+  [[ "$label" == 'watch' ]] && snake='@--'
+
+  tput cup 0 0 2>/dev/null || printf '\033[H'
+  if [[ "$label" == 'watch' ]]; then
+    draw_line " $(colorize "$COLOR_ACCENT" 'SSS Snake watch') | session active"
+    draw_line " host:$STATUS_HOST | load:$load_text | time:$STATUS_TIME"
+    draw_line " $snake"
+  else
+    draw_line " $(colorize "$COLOR_ACCENT" 'SSS Snake idle') | session active"
+    draw_line " host:$STATUS_HOST | load:$load_text | time:$STATUS_TIME"
+    draw_line " status: low CPU mode | fps:$fps_text | AI:off"
+    draw_line ""
+    draw_line "        $snake"
+    draw_line ""
+    draw_line " controls: G/Enter start game | T tmux hint | Q quit"
+  fi
+
+  if [[ -n "${ACTIVITY_HINT:-}" ]]; then
+    draw_line " $ACTIVITY_HINT"
+  fi
+  printf '\033[J'
+}
+
+run_activity_screen() {
+  local key
+  ACTIVITY_HINT=''
+  RUN_MODE="$1"
+  refresh_status 1
+  while true; do
+    draw_activity "$RUN_MODE"
+    key="$(read_key || true)"
+    case "$key" in
+      g|G|ENTER)
+        return 0
+        ;;
+      t|T)
+        ACTIVITY_HINT='tmux: press Ctrl-b then d to detach; run sss again to reattach.'
+        ;;
+      q|Q)
+        exit 0
+        ;;
+    esac
+  done
+}
+
+run_game_loop() {
+  RUN_MODE='game'
+  refresh_status 1
+  reset_board
+  clear
+
+  while true; do
+    draw
+
+    key="$(read_key || true)"
+    if [[ -n "$key" ]]; then
+      handle_key "$key"
+    else
+      if [[ "$mode" == 'manual' ]]; then
+        manual_idle=$((manual_idle + 1))
+        if (( manual_idle >= IDLE_TICKS )); then
+          enter_auto
+        fi
+      fi
+    fi
+
+    if [[ "$mode" == 'auto' ]]; then
+      auto_step
+    else
+      manual_step
+    fi
+  done
+}
 cleanup() {
   save_high_score
   if [[ -n "$old_stty" ]]; then
@@ -1271,6 +1610,7 @@ cleanup() {
 
 setup_colors
 load_high_score
+STATUS_HOST="$(hostname 2>/dev/null || echo unknown)"
 
 old_stty="$(stty -g 2>/dev/null || true)"
 trap cleanup EXIT
@@ -1280,28 +1620,16 @@ trap 'exit 143' TERM
 tput smcup 2>/dev/null || true
 tput civis 2>/dev/null || true
 stty -echo -icanon time 0 min 0 2>/dev/null || true
-
-reset_board
 clear
 
-while true; do
-  draw
-
-  key="$(read_key || true)"
-  if [[ -n "$key" ]]; then
-    handle_key "$key"
-  else
-    if [[ "$mode" == 'manual' ]]; then
-      manual_idle=$((manual_idle + 1))
-      if (( manual_idle >= IDLE_TICKS )); then
-        enter_auto
-      fi
+if [[ "$RUN_MODE" == 'idle' || "$RUN_MODE" == 'watch' ]]; then
+  activity_mode="$RUN_MODE"
+  if run_activity_screen "$activity_mode"; then
+    RUN_MODE='game'
+    if [[ -z "$FPS_ARG" ]]; then
+      DELAY='0.2'
     fi
   fi
+fi
 
-  if [[ "$mode" == 'auto' ]]; then
-    auto_step
-  else
-    manual_step
-  fi
-done
+run_game_loop

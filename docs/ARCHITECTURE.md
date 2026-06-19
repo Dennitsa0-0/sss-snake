@@ -39,13 +39,13 @@ For non-root Linux package managers, `sss` uses `sudo` only after printing a sho
 
 Responsibilities:
 
-- parse game options
+- parse idle/watch/game options
 - size the board from terminal dimensions, environment, or CLI flags
 - switch into the alternate screen buffer
 - save and restore terminal state
 - read keyboard input without blocking the animation loop
 - draw the board in place
-- run autopilot and manual movement
+- run lightweight idle/watch screens, game autopilot, and manual movement
 - persist the high score when enabled
 
 The game requires Bash 4+ for associative arrays.
@@ -64,9 +64,29 @@ The game uses a simple loop:
 
 ## Autopilot
 
-Autopilot follows a deterministic serpentine route over the whole board. This route is stored as arrays of x/y coordinates plus an index lookup map.
+The default `sss` command does not run the game loop. It starts a lightweight idle screen with no AI, no fruits, no pathfinding, and low-frequency redraws.
 
-Because the snake follows a full-board route, it eventually reaches any apple while avoiding itself. When manual mode has been idle for long enough, the current snake is normalized back onto this route and autopilot resumes.
+Playable snake runs through `sss game`, `sss --game`, or `sss-snake game`.
+
+Game mode keeps one fruit model for rendering, eating, hitbox checks, and AI targeting:
+
+```text
+fruit_x[id]
+fruit_y[id]
+fruit_type[id]
+fruit_points[id]
+fruit_grow[id]
+fruit_radius[id]
+```
+
+`fruit_at x y` is the shared hitbox lookup. Normal fruits use radius `0`; `--big-food` uses radius `1`.
+
+AUTO uses `--ai dumb` by default. The safer scorer keeps a current target fruit and uses stable scoring with straight-move preference, turn penalties, recent-position penalties, and vertical oscillation penalties. `--ai smart` is explicit and uses bounded BFS/path caching.
+
+Debug flags:
+
+- `--debug-hitbox` draws fruit hitboxes.
+- `--debug-ai` shows target, next move, reason, and fruit-hitbox consistency warnings.
 
 ## Rendering
 

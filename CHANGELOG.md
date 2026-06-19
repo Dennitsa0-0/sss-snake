@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Made `sss` start a low CPU idle screen by default; use `sss game` for the playable snake.
+- Changed game AUTO default to lightweight `--ai dumb`; `--ai smart` remains explicit.
+- Added shared `fruit_at` hitbox lookup for eating, AI targeting, and debug checks.
+- Added `--debug-ai` and `--debug-hitbox`.
+- Changed ASCII snake body from `o` to `#` to avoid confusion with apples.
+- Updated architecture docs to remove the old serpentine autopilot as the current design.
 ## 0.4.0
 
 - Added safer local move scoring for the default `--ai safe` autopilot.

@@ -8,13 +8,18 @@ show_help() {
 SSS Snake
 
 Usage:
-  sss [snake] [options]
+  sss [idle] [options]
+  sss game [options]
+  sss watch [options]
   sss status
   sss --version
   sss --help
 
 Commands:
-  snake         Start SSS Snake. This is the default command.
+  idle          Start the low CPU SSH activity screen. This is the default command.
+  game          Start the playable snake game.
+  snake         Alias for game.
+  watch         Start a minimal activity screen.
   status        Show tmux and launcher status.
 
 Launcher options:
@@ -22,15 +27,20 @@ Launcher options:
   --no-install    Do not offer to install tmux when it is missing.
   --install-tmux  Install tmux without asking when it is missing.
 
+Mode options:
+  --fps N         Frames per second. idle/watch default: 0.2, range: 0.2..1; game default: 5, max: 10.
+
 Game options:
   --width N        Board width.
   --height N       Board height.
   --fruits N       Fruits on the board, 1..20.
   --big-food       Use larger fruit hitboxes.
+  --debug-hitbox   Draw fruit hitboxes for debugging.
+  --debug-ai       Show autopilot target and decision debug info.
   --wrap           Enable wrap-around edges.
   --no-wrap        Keep edges as walls.
   --path-refresh N Rebuild autopilot path every N ticks.
-  --ai MODE        Autopilot mode: safe, smart, dumb.
+  --ai MODE        Autopilot mode: dumb, safe, smart. Default: dumb.
   --lookahead N    Safe AI lookahead depth.
   --open-radius N  Radius for local open-space scoring.
   --memory N       Head positions remembered for loop detection.
@@ -219,8 +229,14 @@ maybe_install_tmux() {
 
 if [[ $# -gt 0 ]]; then
   case "$1" in
-    snake)
+    idle|watch)
+      mode_command="$1"
       shift
+      set -- "$mode_command" "$@"
+      ;;
+    game|snake)
+      shift
+      set -- game "$@"
       ;;
     status)
       show_status

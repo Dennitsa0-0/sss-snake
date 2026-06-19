@@ -1,4 +1,4 @@
-# SSS Snake
+﻿# SSS Snake
 
 <p align="center">
   <a href="#english">English</a> |
@@ -7,13 +7,7 @@
 
 ## Install / Установка
 
-Quick HTTPS server install and run:
-
-HTTPS is the default installation path.
-Use SSH only if GitHub SSH access is already configured on this machine.
-
-Используйте HTTPS для обычной установки.
-Используйте SSH только если на этой машине уже настроен GitHub SSH-доступ.
+Quick HTTPS install and run:
 
 ```bash
 mkdir -p "$HOME/src" && \
@@ -49,15 +43,7 @@ export PATH="$HOME/.local/bin:$PATH"
 sss
 ```
 
-Or run directly:
-
-```bash
-"$HOME/.local/bin/sss"
-```
-
-SSH install:
-
-Use SSH only if GitHub SSH access is already configured on this machine.
+SSH install, only if GitHub SSH access is already configured:
 
 ```bash
 mkdir -p "$HOME/src" && \
@@ -67,31 +53,6 @@ bash ./install.sh --system && \
 sss
 ```
 
-Repository URLs:
-
-```text
-HTTPS: https://github.com/Dennitsa0-0/sss-snake.git
-SSH:   git@github.com:Dennitsa0-0/sss-snake.git
-```
-
-Run after a system install, or after adding the user install directory to PATH:
-
-```bash
-sss
-```
-
-If `sss` is not found yet:
-
-```bash
-"$HOME/.local/bin/sss"
-```
-
-Add the local bin directory to the shell profile for future terminals:
-
-```bash
-export PATH="$HOME/.local/bin:$PATH"
-```
-
 Update:
 
 ```bash
@@ -99,14 +60,6 @@ cd "$HOME/src/sss-snake" && \
 git pull && \
 bash ./install.sh --system && \
 sss
-```
-
-User install update:
-
-```bash
-cd "$HOME/src/sss-snake" && \
-git pull && \
-bash ./install.sh --user
 ```
 
 Uninstall:
@@ -123,266 +76,116 @@ cd "$HOME/src/sss-snake" && \
 bash ./install.sh --uninstall --system
 ```
 
-Custom prefix uninstall:
+Repository URLs:
 
-```bash
-cd "$HOME/src/sss-snake" && \
-bash ./install.sh --uninstall --prefix /custom/path
+```text
+HTTPS: https://github.com/Dennitsa0-0/sss-snake.git
+SSH:   git@github.com:Dennitsa0-0/sss-snake.git
 ```
 
 <a id="english"></a>
 
 ## English
 
-SSS Snake is a tiny self-playing terminal snake for long SSH sessions.
+SSS Snake is a low CPU SSH activity screen with an optional playable terminal snake.
 
-SSS Snake keeps an SSH terminal visually active with a self-playing snake. Manual control is available at any time.
+The default mode is designed for long SSH sessions: it does not run AI, fruit logic, pathfinding, or high-frequency redraws. The playable snake game starts only when requested.
 
 ```text
- SSS Snake  mode:AUTO  host:server  load:0.08 0.03 0.01
- total:42  manual:3  away ate:12  restarts:0  best:87  fruits:5
- controls: arrows/WASD play | T/Space auto/manual | R restart | Q quit
- +----------------------------+
- | @oo     o    O       *     |
- |                            |
- |            $               |
- |                            |
- +----------------------------+
+ SSS Snake idle | session active
+ host:server | load:0.08 0.03 0.01 | time:07:45:12
+ status: low CPU mode | fps:0.2 | AI:off
+
+        @----
+
+ controls: G/Enter start game | T tmux hint | Q quit
 ```
 
 [Русская версия ниже](#russian)
 
-### Features
-
-- One-command launch with `sss`
-- Safe first-run tmux bootstrap
-- Works without tmux when tmux is unavailable
-- Fast safe autopilot for idle sessions
-- Manual play with arrows or `W A S D`
-- Several fruit types can appear at once: apple, pear, berry, and bonus
-- Walls are enabled by default; `--wrap` enables classic wrap-around
-- `away ate` shows how many fruits the autopilot collected in AUTO mode
-- `--big-food` makes fruit easier to hit by using a larger collision area
-- Color themes with `NO_COLOR` support
-- Configurable board size
-- Persistent high score
-- Bash only: no Python, Node.js, Go, Rust, or curses dependency
-
-### Requirements
-
-- Bash 4+
-- `git` for GitHub install
-- A POSIX-like terminal
-- Standard terminal tools such as `tput`, `stty`, `date`, and `hostname`
-- `tmux` is recommended, but optional
-
-Install `git` first if it is missing:
-
-Debian/Ubuntu:
+### Modes
 
 ```bash
-sudo apt install git
+sss          # low CPU idle screen for SSH
+sss game     # playable snake
+sss --game   # playable snake
+sss watch    # minimal activity screen
+sss snake    # alias for sss game
 ```
 
-Fedora:
+Idle mode:
 
-```bash
-sudo dnf install git
-```
+- default for `sss`
+- updates at `0.2 FPS` by default, about once every 5 seconds
+- idle/watch FPS range: `0.2..1`
+- no AI, no fruits, no pathfinding, no game board
+- hostname is read once at startup
+- load and time are refreshed at most once per frame
 
-Arch:
+Game mode:
 
-```bash
-sudo pacman -S git
-```
-
-### Install
-
-HTTPS server/system install, recommended for servers:
-
-```bash
-mkdir -p "$HOME/src" && \
-git clone https://github.com/Dennitsa0-0/sss-snake.git "$HOME/src/sss-snake" && \
-cd "$HOME/src/sss-snake" && \
-bash ./install.sh --system && \
-sss
-```
-
-For a non-root user that wants a system install:
-
-```bash
-mkdir -p "$HOME/src" && \
-git clone https://github.com/Dennitsa0-0/sss-snake.git "$HOME/src/sss-snake" && \
-cd "$HOME/src/sss-snake" && \
-sudo bash ./install.sh --system && \
-sss
-```
-
-User install without root permissions:
-
-```bash
-mkdir -p "$HOME/src" && \
-git clone https://github.com/Dennitsa0-0/sss-snake.git "$HOME/src/sss-snake" && \
-cd "$HOME/src/sss-snake" && \
-bash ./install.sh --user
-```
-
-After a user install, add SSS Snake to the current shell PATH and run:
-
-```bash
-export PATH="$HOME/.local/bin:$PATH"
-sss
-```
-
-Or run directly:
-
-```bash
-"$HOME/.local/bin/sss"
-```
-
-SSH install:
-
-Use SSH only if GitHub SSH access is already configured on this machine.
-
-```bash
-mkdir -p "$HOME/src" && \
-git clone git@github.com:Dennitsa0-0/sss-snake.git "$HOME/src/sss-snake" && \
-cd "$HOME/src/sss-snake" && \
-bash ./install.sh --system && \
-sss
-```
-
-If `sss` is not found yet, run it directly:
-
-```bash
-"$HOME/.local/bin/sss"
-```
-
-Then add the local bin directory to the shell profile for future terminals:
-
-```bash
-export PATH="$HOME/.local/bin:$PATH"
-```
-
-Update:
-
-```bash
-cd "$HOME/src/sss-snake" && \
-git pull && \
-bash ./install.sh --system && \
-sss
-```
-
-Update a user install:
-
-```bash
-cd "$HOME/src/sss-snake" && \
-git pull && \
-bash ./install.sh --user
-```
-
-Install to a custom prefix:
-
-```bash
-bash ./install.sh --prefix /opt/sss-snake
-```
-
-When a prefix requires administrator permissions, run the installer with `sudo`:
-
-```bash
-sudo bash ./install.sh --prefix /usr/local
-```
-
-The installer does not call `sudo` for its own installation.
-
-Uninstall from a user install:
-
-```bash
-bash ./install.sh --uninstall --user
-```
-
-Uninstall from a system install:
-
-```bash
-bash ./install.sh --uninstall --system
-```
-
-Uninstall from a custom prefix:
-
-```bash
-bash ./install.sh --uninstall --prefix /custom/path
-```
+- starts with `sss game`, `sss --game`, or `sss-snake game`
+- default game FPS is `5`
+- game FPS is capped at `10`
+- AUTO defaults to lightweight `--ai dumb`
+- `--ai smart` is heavier and must be enabled explicitly
 
 ### Quick Start
 
-Start SSS Snake:
+Start the low CPU SSH activity screen:
 
 ```bash
 sss
 ```
 
-From a source checkout:
+Start the playable snake:
 
 ```bash
-./bin/sss
+sss game
 ```
 
 Run without tmux:
 
 ```bash
 sss --no-tmux
+sss game --no-tmux
 ```
 
-Show `sss` status:
+Show status and versions:
 
 ```bash
 sss status
-```
-
-Show versions:
-
-```bash
 sss --version
 sss-snake --version
 ```
 
-Run the game directly:
+Run directly:
 
 ```bash
 sss-snake
+sss-snake game
+sss-snake watch
 ```
 
 ### tmux Behavior
 
-No prior tmux knowledge is required before running SSS Snake.
-
 If `tmux` is installed, `sss` starts or attaches to the `sss-snake` session automatically.
 
-If `tmux` is missing, `sss` briefly explains why it is useful and asks before installing anything:
+If `tmux` is missing, `sss` explains why tmux is useful and asks before installing anything. Pressing Enter means No. SSS Snake never installs packages or calls `sudo` silently.
 
-```text
-tmux is not installed.
-
-SSS Snake can work without tmux, but tmux is recommended.
-It keeps the terminal session alive on the server even if SSH disconnects.
-
-Install tmux now? [y/N]
-```
-
-Pressing Enter means No. `sss` never installs packages or calls `sudo` silently.
-
-Supported package managers, checked in order:
+Supported package managers:
 
 ```text
 apt, dnf, yum, pacman, zypper, apk, brew
 ```
 
-If installation fails or tmux installation is skipped, SSS Snake runs directly in the current terminal.
-
 ### Commands
 
 ```bash
 sss
+sss game
+sss --game
+sss watch
 sss snake
 sss status
 sss --version
@@ -390,60 +193,60 @@ sss --no-tmux
 sss --no-install
 sss --install-tmux
 sss-snake
+sss-snake game
+sss-snake watch
 sss-snake --version
 ```
 
-`sss` options:
+Launcher options:
 
 | Option | Behavior |
 | --- | --- |
-| `--no-tmux` | Do not check, install, start, or attach tmux. Run the game directly. |
+| `--no-tmux` | Run the selected mode directly without checking, installing, starting, or attaching tmux. |
 | `--no-install` | Use tmux if it exists. Do not ask to install it if missing. |
 | `--install-tmux` | If tmux is missing, try to install it without an interactive prompt. |
 
-Game options:
+Mode and game options:
 
 | Option | Behavior |
 | --- | --- |
-| `--width N` | Set board width. It is capped by the terminal width. |
-| `--height N` | Set board height. It is capped by the terminal height. |
-| `--fruits N` | Set how many fruits are on the board, clamped to `1..20`. Default: `4`. |
-| `--big-food` | Make fruit count as eaten within a 3x3 hitbox. |
+| `--fps N` | Set frames per second. Idle/watch default: `0.2`; game default: `5`; idle/watch cap: `1`; game cap: `10`. |
+| `--width N` | Set board width for game mode. |
+| `--height N` | Set board height for game mode. |
+| `--fruits N` | Number of fruits on the board, clamped to `1..20`. Default: `4`. |
+| `--big-food` | Fruit hitboxes use radius `1`, making a 3x3 hitbox. |
+| `--debug-hitbox` | Draw fruit hitboxes for debugging. |
+| `--debug-ai` | Show autopilot target, next move, reason, and hitbox consistency warnings. |
 | `--wrap` | Enable wrap-around edges. |
-| `--no-wrap` | Use walls on board edges. This is the default. |
-| `--path-refresh N` | Rebuild the smart autopilot path at most every N ticks. Default: `10`. |
-| `--ai MODE` | Autopilot mode: `safe`, `smart`, or `dumb`. Default: `safe`. |
-| `--lookahead N` | Safe AI lookahead depth. Default: `1`. |
-| `--open-radius N` | Radius for local open-space scoring. Default: `2`. |
-| `--memory N` | Number of recent head positions used for loop detection. Default: `20`. |
-| `--emergency-after N` | Stale ticks before safe AI switches to open-space emergency movement. Default: `20`. |
-| `--max-ai-cells N` | Use greedy movement above this board area. Default: `1200`. |
-| `--max-ai-steps N` | Maximum BFS nodes per smart path rebuild. Default: `300`. |
+| `--no-wrap` | Keep edges as walls. Default. |
+| `--ai MODE` | Game autopilot mode: `dumb`, `safe`, or `smart`. Default: `dumb`. |
+| `--path-refresh N` | Rebuild smart autopilot path at most every N ticks. |
+| `--lookahead N` | Safe AI lookahead depth. |
+| `--open-radius N` | Radius for local open-space scoring. |
+| `--memory N` | Recent head positions remembered for loop detection. |
+| `--emergency-after N` | Stale ticks before emergency movement. |
+| `--max-ai-cells N` | Use greedy movement above this board area. |
+| `--max-ai-steps N` | Maximum BFS nodes per smart path rebuild. |
 | `--idle-ticks N` | Return to autopilot after N idle ticks in manual mode. |
-| `--theme NAME` | Use `classic`, `matrix`, `ocean`, `ember`, or `mono`. |
-| `--ascii` | Use ASCII board and food symbols. Useful when Unicode renders badly. |
+| `--theme NAME` | Theme: `classic`, `matrix`, `ocean`, `ember`, or `mono`. |
+| `--ascii` | ASCII symbols: head `@`, body `#`, apple `o`, pear `O`, berry `*`, bonus `$`. |
 | `--unicode` | Try Unicode symbols; falls back to ASCII if UTF-8 is unavailable. |
 | `--no-score` | Do not read or write the high score file. |
 
 Examples:
 
 ```bash
-sss --theme ocean --width 60 --height 18
-sss --fruits 8 --big-food
-sss --ascii --width 60 --height 18
-sss --memory 20 --open-radius 2 --emergency-after 20
-sss --ai smart --path-refresh 15
-sss --ai dumb --width 80 --height 24
-sss --no-install --theme mono --ascii
-sss-snake 0.20 --theme matrix
+sss --fps 0.2
+sss watch --fps 0.2
+sss game --fps 5 --theme ocean --width 60 --height 18
+sss game --fruits 8 --big-food
+sss game --debug-ai --debug-hitbox
+sss game --ai smart --path-refresh 15
+sss game --ai dumb --width 80 --height 24
+sss-snake game 0.20 --theme matrix
 ```
 
-By default, SSS Snake uses a fast safe autopilot.
-It prefers smooth movement over perfect pathfinding.
-`--ai smart` enables heavier pathfinding, and `--ai dumb` keeps movement maximally lightweight.
-Smart AI can be heavier on large fields, so large boards fall back to fast greedy movement unless AI limits are raised.
-
-### Controls
+### Game Controls
 
 | Key | Action |
 | --- | --- |
@@ -453,6 +256,14 @@ Smart AI can be heavier on large fields, so large boards fall back to fast greed
 | `R` | Restart the board |
 | `Q` | Quit |
 
+Idle screen controls:
+
+| Key | Action |
+| --- | --- |
+| `G` or Enter | Start game mode |
+| `T` | Show tmux detach hint |
+| `Q` | Quit |
+
 ### Environment
 
 | Variable | Meaning |
@@ -460,22 +271,23 @@ Smart AI can be heavier on large fields, so large boards fall back to fast greed
 | `SSS_TMUX_SESSION` | tmux session name, default `sss-snake` |
 | `SSS_NO_TMUX=1` | Disable the tmux wrapper |
 | `SSS_NO_INSTALL_PROMPT=1` | Do not ask to install tmux |
-| `SSS_WIDTH` | Default board width |
-| `SSS_HEIGHT` | Default board height |
-| `SSS_FRUITS` | Default fruit count |
-| `SSS_IDLE_TICKS` | Idle ticks before returning to autopilot |
+| `SSS_FPS` | Default FPS, capped by the selected mode |
+| `SSS_WIDTH` | Default game board width |
+| `SSS_HEIGHT` | Default game board height |
+| `SSS_FRUITS` | Default game fruit count |
+| `SSS_IDLE_TICKS` | Idle ticks before returning to autopilot in game mode |
 | `SSS_PATH_REFRESH` | Smart autopilot path refresh interval |
-| `SSS_AI` | Default AI mode: `safe`, `smart`, or `dumb` |
+| `SSS_AI` | Default game AI mode: `dumb`, `safe`, or `smart` |
 | `SSS_LOOKAHEAD` | Safe AI lookahead depth |
 | `SSS_OPEN_RADIUS` | Safe AI open-space scoring radius |
-| `SSS_MEMORY` | Safe AI loop-detection memory length |
+| `SSS_MEMORY` | Safe AI memory length |
 | `SSS_EMERGENCY_AFTER` | Safe AI stale tick limit |
 | `SSS_MAX_AI_CELLS` | Default max board cells for smart BFS |
 | `SSS_MAX_AI_STEPS` | Default BFS node limit |
 | `SSS_THEME` | Default theme |
 | `SSS_ASCII=1` | Use ASCII symbols |
 | `SSS_NO_SCORE=1` | Disable high score persistence |
-| `NO_COLOR=1` | Disable colors |
+| `NO_COLOR=1` | Disable color output |
 
 High scores are stored in:
 
@@ -483,11 +295,19 @@ High scores are stored in:
 $XDG_STATE_HOME/sss-snake/high-score
 ```
 
-If `XDG_STATE_HOME` is not set, SSS Snake uses:
+If `XDG_STATE_HOME` is not set:
 
 ```text
 $HOME/.local/state/sss-snake/high-score
 ```
+
+### Design Notes
+
+Idle mode is intentionally boring: it is an SSH activity screen, not a Bash game loop.
+
+Game mode uses one fruit model for rendering, hitbox checks, eating, and AI targeting. The shared lookup is `fruit_at x y`. Normal fruits use radius `0`; `--big-food` uses radius `1`.
+
+AUTO uses `--ai dumb` by default. `--ai safe` adds local scoring, stable target selection, straight-move preference, turn penalties, recent-position penalties, and vertical oscillation penalties. `--ai smart` uses bounded BFS/path caching and is intentionally explicit.
 
 ### Recommended SSH Keepalive
 
@@ -504,7 +324,7 @@ Host *
 SSS Snake does not:
 
 - install tmux without confirmation during normal `sss` launches
-- call `sudo` without warning
+- call `sudo` silently
 - modify `.bashrc`, `.profile`, or `.zshrc`
 - add shell autostart
 - remove packages
@@ -521,16 +341,6 @@ The only package installation `sss` can attempt is `tmux`, and only after explic
 - Not a daemon or systemd service
 - Not a guarantee that SSH will stay connected forever
 
-### Design
-
-By default, SSS Snake uses `--ai safe`: a fast local autopilot that values survivable space over the shortest route to fruit. Each candidate move rejects walls, body collisions, 180-degree turns, and dead-end cells, then scores safe exits, local open area, distance to fruit, and recent head-position repeats.
-
-Emergency mode activates when AUTO movement stops making progress or repeats recent head positions. In that mode, safe AI ignores fruit distance and moves toward the most open local area until a healthier route appears.
-
-`--ai smart` keeps a cached path to fruit and rebuilds it only occasionally or when it becomes stale. It uses one limited BFS from the snake head and stops when it finds a reachable fruit hitbox. If the path is not ready or becomes unsafe, the snake keeps moving with the same fast safe-move logic. `--ai dumb` avoids BFS entirely and only tries to keep moving safely.
-
-By default, the board edges are walls. Hitting a wall or the snake body restarts the round while keeping the total score and high score. Manual mode starts from arrows or `W A S D`; `T` or `Space` returns to autopilot, and idle manual play returns automatically after `--idle-ticks`.
-
 [Back to top](#sss-snake)
 
 ---
@@ -539,251 +349,105 @@ By default, the board edges are walls. Hitting a wall or the snake body restarts
 
 ## Русский
 
-SSS Snake - маленькая самоиграющая змейка для долгих SSH-сессий.
+SSS Snake — лёгкий экран активности для SSH-сессий с отдельной опциональной терминальной змейкой.
 
-SSS Snake keeps an SSH terminal visually active with a self-playing snake. Manual control is available at any time.
+Обычный запуск `sss` показывает лёгкий idle-экран. Он не запускает AI, фрукты, поиск пути и частую перерисовку. Полноценная игра запускается только явно.
 
 ```text
- SSS Snake  mode:AUTO  host:server  load:0.08 0.03 0.01
- total:42  manual:3  away ate:12  restarts:0  best:87  fruits:5
- controls: arrows/WASD play | T/Space auto/manual | R restart | Q quit
- +----------------------------+
- | @oo     o    O       *     |
- |                            |
- |            $               |
- |                            |
- +----------------------------+
+ SSS Snake idle | session active
+ host:server | load:0.08 0.03 0.01 | time:07:45:12
+ status: low CPU mode | fps:0.2 | AI:off
+
+        @----
+
+ controls: G/Enter start game | T tmux hint | Q quit
 ```
 
 [English version above](#english)
 
-### Возможности
-
-- Запуск одной командой `sss`
-- Безопасная первая настройка tmux
-- Работа без tmux, если tmux недоступен
-- Автопилот для оставленной SSH-сессии
-- Ручное управление стрелками или `W A S D`
-- Цветовые темы и поддержка `NO_COLOR`
-- Настраиваемый размер поля
-- Сохранение лучшего счета
-- Только Bash: без Python, Node.js, Go, Rust и curses
-
-### Требования
-
-- Bash 4+
-- `git` для установки из GitHub
-- POSIX-подобный терминал
-- Стандартные терминальные утилиты: `tput`, `stty`, `date`, `hostname`
-- `tmux` рекомендуется, но не обязателен
-
-Если `git` не установлен, сначала установите его:
-
-Debian/Ubuntu:
+### Режимы
 
 ```bash
-sudo apt install git
+sss          # лёгкий idle-экран для SSH
+sss game     # полноценная змейка
+sss --game   # полноценная змейка
+sss watch    # минимальный экран активности
+sss snake    # алиас для sss game
 ```
 
-Fedora:
+Idle mode:
 
-```bash
-sudo dnf install git
-```
+- режим по умолчанию для `sss`
+- обновляется с `0.2 FPS` по умолчанию, примерно раз в 5 секунд
+- диапазон FPS для idle/watch: `0.2..1`
+- без AI, фруктов, поиска пути и игрового поля
+- hostname читается один раз при запуске
+- load/time обновляются не чаще одного раза за кадр
 
-Arch:
+Game mode:
 
-```bash
-sudo pacman -S git
-```
-
-### Установка
-
-Установка через HTTPS, рекомендуемый вариант для сервера:
-
-```bash
-mkdir -p "$HOME/src" && \
-git clone https://github.com/Dennitsa0-0/sss-snake.git "$HOME/src/sss-snake" && \
-cd "$HOME/src/sss-snake" && \
-bash ./install.sh --system && \
-sss
-```
-
-Если обычному пользователю нужна system-установка:
-
-```bash
-mkdir -p "$HOME/src" && \
-git clone https://github.com/Dennitsa0-0/sss-snake.git "$HOME/src/sss-snake" && \
-cd "$HOME/src/sss-snake" && \
-sudo bash ./install.sh --system && \
-sss
-```
-
-Пользовательская установка без root-прав:
-
-```bash
-mkdir -p "$HOME/src" && \
-git clone https://github.com/Dennitsa0-0/sss-snake.git "$HOME/src/sss-snake" && \
-cd "$HOME/src/sss-snake" && \
-bash ./install.sh --user
-```
-
-После пользовательской установки добавьте путь в текущий shell и запустите:
-
-```bash
-export PATH="$HOME/.local/bin:$PATH"
-sss
-```
-
-Или запустите напрямую:
-
-```bash
-"$HOME/.local/bin/sss"
-```
-
-Установка через SSH:
-
-Используйте SSH только если на этой машине уже настроен GitHub SSH-доступ.
-
-```bash
-mkdir -p "$HOME/src" && \
-git clone git@github.com:Dennitsa0-0/sss-snake.git "$HOME/src/sss-snake" && \
-cd "$HOME/src/sss-snake" && \
-bash ./install.sh --system && \
-sss
-```
-
-Если `sss` пока не найден, запустите напрямую:
-
-```bash
-"$HOME/.local/bin/sss"
-```
-
-Потом добавьте эту строку в shell profile для будущих терминалов:
-
-```bash
-export PATH="$HOME/.local/bin:$PATH"
-```
-
-Обновление:
-
-```bash
-cd "$HOME/src/sss-snake" && \
-git pull && \
-bash ./install.sh --system && \
-sss
-```
-
-Обновление пользовательской установки:
-
-```bash
-cd "$HOME/src/sss-snake" && \
-git pull && \
-bash ./install.sh --user
-```
-
-Установка в другой prefix:
-
-```bash
-bash ./install.sh --prefix /opt/sss-snake
-```
-
-Если для prefix нужны права администратора, запустите установщик через `sudo` сами:
-
-```bash
-sudo bash ./install.sh --prefix /usr/local
-```
-
-Установщик не вызывает `sudo` для собственной установки.
-
-Удаление пользовательской установки:
-
-```bash
-bash ./install.sh --uninstall --user
-```
-
-Удаление system-установки:
-
-```bash
-bash ./install.sh --uninstall --system
-```
-
-Удаление из другого prefix:
-
-```bash
-bash ./install.sh --uninstall --prefix /custom/path
-```
+- запускается через `sss game`, `sss --game` или `sss-snake game`
+- FPS игры по умолчанию: `5`
+- максимум для игры: `10 FPS`
+- AUTO по умолчанию использует лёгкий `--ai dumb`
+- `--ai smart` тяжелее и включается только явно
 
 ### Быстрый старт
 
-Запустить SSS Snake:
+Запустить лёгкий SSH idle-экран:
 
 ```bash
 sss
 ```
 
-Из исходников:
+Запустить игру:
 
 ```bash
-./bin/sss
+sss game
 ```
 
 Запустить без tmux:
 
 ```bash
 sss --no-tmux
+sss game --no-tmux
 ```
 
-Показать статус `sss`:
+Показать статус и версии:
 
 ```bash
 sss status
-```
-
-Показать версии:
-
-```bash
 sss --version
 sss-snake --version
 ```
 
-Запустить игру напрямую:
+Запустить напрямую:
 
 ```bash
 sss-snake
+sss-snake game
+sss-snake watch
 ```
 
 ### Поведение tmux
 
-Вам не нужно заранее знать tmux, чтобы запустить SSS Snake.
-
 Если `tmux` установлен, `sss` автоматически запускает или подключает сессию `sss-snake`.
 
-Если `tmux` не найден, `sss` коротко объясняет, зачем он нужен, и спрашивает перед установкой:
+Если `tmux` не найден, `sss` объясняет, зачем он нужен, и спрашивает перед установкой. Enter означает No. SSS Snake не устанавливает пакеты и не вызывает `sudo` молча.
 
-```text
-tmux is not installed.
-
-SSS Snake can work without tmux, but tmux is recommended.
-It keeps the terminal session alive on the server even if SSH disconnects.
-
-Install tmux now? [y/N]
-```
-
-Enter означает No. `sss` не устанавливает пакеты и не вызывает `sudo` молча.
-
-Поддерживаемые пакетные менеджеры, порядок проверки:
+Поддерживаемые пакетные менеджеры:
 
 ```text
 apt, dnf, yum, pacman, zypper, apk, brew
 ```
 
-Если установка не удалась или вы решили не устанавливать tmux, SSS Snake запускается прямо в текущем терминале.
-
 ### Команды
 
 ```bash
 sss
+sss game
+sss --game
+sss watch
 sss snake
 sss status
 sss --version
@@ -791,55 +455,60 @@ sss --no-tmux
 sss --no-install
 sss --install-tmux
 sss-snake
+sss-snake game
+sss-snake watch
 sss-snake --version
 ```
 
-Флаги `sss`:
+Флаги launcher:
 
 | Флаг | Поведение |
 | --- | --- |
-| `--no-tmux` | Не проверять, не ставить и не запускать tmux. Сразу запустить игру напрямую. |
+| `--no-tmux` | Запустить выбранный режим напрямую, без проверки, установки, запуска или подключения tmux. |
 | `--no-install` | Использовать tmux, если он есть. Не спрашивать установку, если его нет. |
 | `--install-tmux` | Если tmux отсутствует, попробовать установить его без интерактивного вопроса. |
 
-Флаги игры:
+Флаги режимов и игры:
 
 | Флаг | Поведение |
 | --- | --- |
-| `--width N` | Ширина поля, ограничивается диапазоном `20..100`. |
-| `--height N` | Высота поля, ограничивается диапазоном `10..40`. |
+| `--fps N` | FPS. По умолчанию: idle/watch `0.2`, игра `5`; лимит idle/watch `1`, лимит игры `10`. |
+| `--width N` | Ширина поля в game mode. |
+| `--height N` | Высота поля в game mode. |
 | `--fruits N` | Количество фруктов на поле, `1..20`. По умолчанию: `4`. |
-| `--big-food` | Увеличить hitbox фруктов до 3x3. |
+| `--big-food` | Hitbox фруктов радиуса `1`, то есть 3x3. |
+| `--debug-hitbox` | Показать hitbox фруктов для отладки. |
+| `--debug-ai` | Показать цель автопилота, следующий ход, причину и предупреждения hitbox. |
 | `--wrap` | Включить перенос через края поля. |
-| `--no-wrap` | Использовать стены по краям поля. Это режим по умолчанию. |
-| `--path-refresh N` | Пересобирать smart-маршрут не чаще чем раз в N тиков. По умолчанию: `10`. |
-| `--ai MODE` | Режим автопилота: `safe`, `smart` или `dumb`. По умолчанию: `safe`. |
-| `--max-ai-cells N` | Использовать greedy-режим, если площадь поля больше этого значения. По умолчанию: `1200`. |
-| `--max-ai-steps N` | Максимум BFS-узлов на один пересчет smart-маршрута. По умолчанию: `300`. |
-| `--idle-ticks N` | Через сколько idle-тиков ручной режим вернется в автопилот. |
+| `--no-wrap` | Использовать стены по краям поля. По умолчанию. |
+| `--ai MODE` | Режим автопилота в игре: `dumb`, `safe` или `smart`. По умолчанию: `dumb`. |
+| `--path-refresh N` | Пересобирать smart-маршрут не чаще чем раз в N тиков. |
+| `--lookahead N` | Глубина lookahead для safe AI. |
+| `--open-radius N` | Радиус оценки свободного пространства. |
+| `--memory N` | Сколько последних позиций головы помнить. |
+| `--emergency-after N` | Через сколько stale-тиков включать аварийное движение. |
+| `--max-ai-cells N` | Использовать greedy-движение выше этой площади поля. |
+| `--max-ai-steps N` | Максимум BFS-узлов на один пересчёт smart-маршрута. |
+| `--idle-ticks N` | Через сколько idle-тиков ручной режим вернётся в AUTO. |
 | `--theme NAME` | Тема: `classic`, `matrix`, `ocean`, `ember`, `mono`. |
-| `--ascii` | Использовать ASCII-символы. |
-| `--unicode` | Использовать Unicode-символы. |
-| `--no-score` | Не читать и не писать файл лучшего счета. |
+| `--ascii` | ASCII-символы: голова `@`, тело `#`, apple `o`, pear `O`, berry `*`, bonus `$`. |
+| `--unicode` | Попробовать Unicode; fallback на ASCII, если UTF-8 недоступен. |
+| `--no-score` | Не читать и не писать файл лучшего счёта. |
 
 Примеры:
 
 ```bash
-sss --theme ocean --width 60 --height 18
-sss --fruits 8 --big-food
-sss --ai smart --path-refresh 15
-sss --ai dumb --width 80 --height 24
-sss --no-install --theme mono --ascii
-sss-snake 0.20 --theme matrix
+sss --fps 0.2
+sss watch --fps 0.2
+sss game --fps 5 --theme ocean --width 60 --height 18
+sss game --fruits 8 --big-food
+sss game --debug-ai --debug-hitbox
+sss game --ai smart --path-refresh 15
+sss game --ai dumb --width 80 --height 24
+sss-snake game 0.20 --theme matrix
 ```
 
-По умолчанию SSS Snake использует быстрый безопасный автопилот.
-Главный приоритет — плавное движение, а не идеальный поиск пути.
-Для более умного, но тяжёлого режима используйте `--ai smart`.
-Для максимально лёгкого режима используйте `--ai dumb`.
-На больших полях smart AI может быть тяжелее, поэтому игра использует быстрый greedy-режим, если поле превышает лимит AI.
-
-### Управление
+### Управление в игре
 
 | Клавиша | Действие |
 | --- | --- |
@@ -849,27 +518,40 @@ sss-snake 0.20 --theme matrix
 | `R` | Перезапустить поле |
 | `Q` | Выйти |
 
+Управление idle-экраном:
+
+| Клавиша | Действие |
+| --- | --- |
+| `G` или Enter | Запустить игру |
+| `T` | Показать подсказку tmux detach |
+| `Q` | Выйти |
+
 ### Переменные окружения
 
 | Переменная | Значение |
 | --- | --- |
 | `SSS_TMUX_SESSION` | Имя tmux-сессии, по умолчанию `sss-snake` |
-| `SSS_NO_TMUX=1` | Отключить tmux-обертку |
+| `SSS_NO_TMUX=1` | Отключить tmux-обёртку |
 | `SSS_NO_INSTALL_PROMPT=1` | Не спрашивать про установку tmux |
-| `SSS_WIDTH` | Ширина поля по умолчанию |
-| `SSS_HEIGHT` | Высота поля по умолчанию |
+| `SSS_FPS` | FPS по умолчанию, ограничивается выбранным режимом |
+| `SSS_WIDTH` | Ширина игрового поля по умолчанию |
+| `SSS_HEIGHT` | Высота игрового поля по умолчанию |
 | `SSS_FRUITS` | Количество фруктов по умолчанию |
-| `SSS_IDLE_TICKS` | Idle-тики до возврата в автопилот |
-| `SSS_PATH_REFRESH` | Интервал пересчета smart-маршрута |
-| `SSS_AI` | Режим AI по умолчанию: `safe`, `smart` или `dumb` |
+| `SSS_IDLE_TICKS` | Idle-тики до возврата в AUTO в game mode |
+| `SSS_PATH_REFRESH` | Интервал пересчёта smart-маршрута |
+| `SSS_AI` | Режим AI в игре по умолчанию: `dumb`, `safe` или `smart` |
+| `SSS_LOOKAHEAD` | Глубина lookahead для safe AI |
+| `SSS_OPEN_RADIUS` | Радиус оценки свободного пространства |
+| `SSS_MEMORY` | Длина памяти recent positions |
+| `SSS_EMERGENCY_AFTER` | Лимит stale-тиков для safe AI |
 | `SSS_MAX_AI_CELLS` | Максимальная площадь поля для smart BFS |
-| `SSS_MAX_AI_STEPS` | Лимит BFS-узлов на один пересчет |
+| `SSS_MAX_AI_STEPS` | Лимит BFS-узлов на один пересчёт |
 | `SSS_THEME` | Тема по умолчанию |
 | `SSS_ASCII=1` | Использовать ASCII-символы |
-| `SSS_NO_SCORE=1` | Отключить сохранение лучшего счета |
+| `SSS_NO_SCORE=1` | Отключить сохранение лучшего счёта |
 | `NO_COLOR=1` | Отключить цвета |
 
-Лучший счет хранится здесь:
+Лучший счёт хранится здесь:
 
 ```text
 $XDG_STATE_HOME/sss-snake/high-score
@@ -881,9 +563,17 @@ $XDG_STATE_HOME/sss-snake/high-score
 $HOME/.local/state/sss-snake/high-score
 ```
 
+### Устройство
+
+Idle mode намеренно скучный: это экран активности SSH, а не игровой Bash-loop.
+
+Game mode использует единую модель фруктов для отрисовки, hitbox, поедания и выбора цели AI. Общая функция проверки — `fruit_at x y`. Обычный фрукт имеет радиус `0`; `--big-food` использует радиус `1`.
+
+AUTO по умолчанию использует `--ai dumb`. `--ai safe` добавляет локальную оценку ходов, стабильную цель, бонус за прямое движение, штрафы за повороты, recent-position penalty и штраф за вертикальное дёргание. `--ai smart` использует ограниченный BFS и кэш маршрута, поэтому включается только явно.
+
 ### Рекомендуемый SSH Keepalive
 
-SSS Snake не заменяет SSH keepalive. Он хорошо работает вместе с tmux и короткой настройкой SSH-клиента:
+SSS Snake не заменяет SSH keepalive. Он хорошо сочетается с tmux и короткой настройкой SSH-клиента:
 
 ```sshconfig
 Host *
@@ -896,7 +586,7 @@ Host *
 SSS Snake не делает этого:
 
 - не устанавливает tmux без подтверждения при обычном запуске `sss`
-- не вызывает `sudo` без предупреждения
+- не вызывает `sudo` молча
 - не меняет `.bashrc`, `.profile` или `.zshrc`
 - не добавляет автозапуск
 - не удаляет пакеты
@@ -904,7 +594,7 @@ SSS Snake не делает этого:
 - не скачивает сторонние бинарники
 - не выполняет `curl | bash`
 
-Единственный пакет, который может попробовать установить `sss`, - это `tmux`, и только после явного подтверждения или флага `--install-tmux`.
+Единственный пакет, который `sss` может попробовать установить, — это `tmux`, и только после явного подтверждения или флага `--install-tmux`.
 
 ### Чем SSS Snake не является
 
@@ -912,11 +602,5 @@ SSS Snake не делает этого:
 - Не монитор сервера
 - Не daemon и не systemd service
 - Не гарантия вечного SSH-подключения
-
-### Устройство
-
-По умолчанию SSS Snake использует `--ai safe`: быстрый greedy-автопилот, который идет к ближайшему фрукту, избегает стен, тела змейки и разворота на 180 градусов. Главный приоритет - плавное движение, а не идеальный поиск пути.
-
-`--ai smart` хранит кэшированный маршрут к фрукту и пересчитывает его только иногда или когда маршрут устарел. Он использует один ограниченный BFS от головы змейки и останавливается, когда находит достижимый hitbox фрукта. Если маршрут не готов или стал опасным, змейка продолжает движение через быстрый safe move. `--ai dumb` вообще не использует BFS и только старается двигаться безопасно.
 
 [Наверх](#sss-snake)

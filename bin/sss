@@ -28,7 +28,7 @@ Launcher options:
   --install-tmux  Install tmux without asking when it is missing.
 
 Mode options:
-  --fps N         Frames per second. idle/watch default: 0.2, range: 0.2..1; game default: 5, max: 10.
+  --fps N         Frames per second. idle/watch default: 1, range: 0.2..1; game default: 1, max: 10.
 
 Game options:
   --width N        Board width.

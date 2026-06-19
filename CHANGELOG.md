@@ -2,12 +2,19 @@
 
 ## Unreleased
 
-- Made `sss` start a low CPU idle screen by default; use `sss game` for the playable snake.
+- Made `sss` start a low CPU idle screen by default; use `sss game`, `sss --game`, or `sss snake` for the playable snake.
+- Added explicit `idle`, `game`, and `watch` modes.
+- Set idle/watch default FPS to `1` and capped idle/watch at `1 FPS`.
+- Lowered game default FPS to `1`; higher game speed must be requested explicitly with `--fps`.
 - Changed game AUTO default to lightweight `--ai dumb`; `--ai smart` remains explicit.
+- Initialized AI target/debug/path state before the first game frame and on board reset, fixing immediate `[exited]` failures under `set -u`.
 - Added shared `fruit_at` hitbox lookup for eating, AI targeting, and debug checks.
+- Added persistent AI target state to reduce up/down oscillation near reachable fruit.
 - Added `--debug-ai` and `--debug-hitbox`.
 - Changed ASCII snake body from `o` to `#` to avoid confusion with apples.
-- Updated architecture docs to remove the old serpentine autopilot as the current design.
+- Added LF line-ending enforcement through `.gitattributes`, CI, and `make lint` to prevent CRLF shell syntax failures.
+- Updated README and architecture docs for low CPU default mode, unified fruit handling, and the current autopilot design.
+
 ## 0.4.0
 
 - Added safer local move scoring for the default `--ai safe` autopilot.

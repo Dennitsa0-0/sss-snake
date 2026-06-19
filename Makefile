@@ -1,3 +1,5 @@
+SHELL := /usr/bin/env bash
+
 PREFIX ?= $(HOME)/.local
 BINDIR := $(PREFIX)/bin
 TEXT_FILES := bin install.sh .github docs README.md TASK_SPEC.md CHANGELOG.md Makefile .gitattributes

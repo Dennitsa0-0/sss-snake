@@ -91,7 +91,7 @@ Examples:
 ```bash
 sss-snake
 sss-snake --version
-sss-snake 0.20
+sss-snake 1
 sss-snake --theme matrix --width 70 --height 20
 ```
 

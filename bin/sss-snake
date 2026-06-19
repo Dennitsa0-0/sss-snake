@@ -22,10 +22,10 @@ Arguments:
   idle              Low CPU SSH activity screen. Default
   watch             Minimal activity screen
   game              Playable snake mode
-  delay             Game frame delay in seconds. Default: 0.20
+  delay             Game frame delay in seconds. Default: 1
 
 Options:
-  --fps N           Frames per second. idle/watch default: 0.2, range: 0.2..1; game default: 5, max: 10
+  --fps N           Frames per second. idle/watch default: 1, range: 0.2..1; game default: 1, max: 10
   --width N          Board width. Default: 50, capped by terminal
   --height N         Board height. Default: 16, capped by terminal
   --fruits N         Fruits on the board, 1..20. Default: 4
@@ -350,10 +350,11 @@ if [[ -z "$DELAY" ]]; then
     FPS_ARG="$(clamp_fps "${SSS_FPS}")"
     DELAY="$(fps_to_delay "$FPS_ARG")"
   elif [[ "$RUN_MODE" == 'game' ]]; then
-    DELAY='0.2'
+    FPS_ARG='1'
+    DELAY='1'
   else
-    FPS_ARG='0.2'
-    DELAY='5'
+    FPS_ARG='1'
+    DELAY='1'
   fi
 elif [[ "$RUN_MODE" != 'game' ]]; then
   die "delay is only supported in game mode; use --fps for idle/watch"
@@ -543,6 +544,20 @@ score_total=0
 score_auto_away=0
 score_manual=0
 restarts=0
+target_fruit_id=-1
+target_x=-1
+target_y=-1
+target_age=0
+AI_NEXT=''
+AI_REASON='init'
+AI_TARGET_TEXT='none'
+AI_BUG=''
+path_len=0
+path_target_id=-1
+last_head_key=''
+last_auto_dir='RIGHT'
+stale_ticks=0
+emergency_mode=0
 mode='auto'
 dir='RIGHT'
 manual_idle=0
@@ -703,6 +718,20 @@ reset_board() {
   ai_emergency=0
   ai_stale_ticks=0
   ai_last_distance=-1
+  target_fruit_id=-1
+  target_x=-1
+  target_y=-1
+  target_age=0
+  AI_NEXT=''
+  AI_REASON='init'
+  AI_TARGET_TEXT='none'
+  AI_BUG=''
+  path_len=0
+  path_target_id=-1
+  last_head_key=''
+  last_auto_dir='RIGHT'
+  stale_ticks=0
+  emergency_mode=0
 
   length=5
   growth_pending=0
@@ -838,7 +867,7 @@ eat_fruit() {
 }
 
 move_to() {
-  local nx="$1" ny="$2" fruit_idx='' grow=0 grow_add=0 remove_tail=1 had_pending=0 tail_x tail_y i
+  local nx="$1" ny="$2" fruit_idx='' grow=0 grow_add=0 remove_tail=1 had_pending=0 tail_x tail_y i bug_idx
 
   if (( nx < 0 || nx >= W || ny < 0 || ny >= H )); then
     restart_keep_score
@@ -894,7 +923,6 @@ move_to() {
   fi
 
   if (( DEBUG_AI == 1 )); then
-    local bug_idx
     if bug_idx="$(fruit_at "${body_x[0]}" "${body_y[0]}")"; then
       AI_BUG="head is inside fruit hitbox but fruit was not eaten id=$bug_idx"
     else
@@ -1654,7 +1682,8 @@ if [[ "$RUN_MODE" == 'idle' || "$RUN_MODE" == 'watch' ]]; then
   if run_activity_screen "$activity_mode"; then
     RUN_MODE='game'
     if [[ -z "$FPS_ARG" ]]; then
-      DELAY='0.2'
+      FPS_ARG='1'
+      DELAY='1'
     fi
   fi
 fi

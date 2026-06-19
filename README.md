@@ -94,7 +94,7 @@ The default mode is designed for long SSH sessions: it does not run AI, fruit lo
 ```text
  SSS Snake idle | session active
  host:server | load:0.08 0.03 0.01 | time:07:45:12
- status: low CPU mode | fps:0.2 | AI:off
+ status: low CPU mode | fps:1 | AI:off
 
         @----
 
@@ -116,7 +116,7 @@ sss snake    # alias for sss game
 Idle mode:
 
 - default for `sss`
-- updates at `0.2 FPS` by default, about once every 5 seconds
+- updates at `1 FPS` by default, about once per second
 - idle/watch FPS range: `0.2..1`
 - no AI, no fruits, no pathfinding, no game board
 - hostname is read once at startup
@@ -125,7 +125,7 @@ Idle mode:
 Game mode:
 
 - starts with `sss game`, `sss --game`, or `sss-snake game`
-- default game FPS is `5`
+- default game FPS is `1`
 - game FPS is capped at `10`
 - AUTO defaults to lightweight `--ai dumb`
 - `--ai smart` is heavier and must be enabled explicitly
@@ -210,7 +210,7 @@ Mode and game options:
 
 | Option | Behavior |
 | --- | --- |
-| `--fps N` | Set frames per second. Idle/watch default: `0.2`; game default: `5`; idle/watch cap: `1`; game cap: `10`. |
+| `--fps N` | Set frames per second. Idle/watch default: `1`; game default: `1`; idle/watch cap: `1`; game cap: `10`. |
 | `--width N` | Set board width for game mode. |
 | `--height N` | Set board height for game mode. |
 | `--fruits N` | Number of fruits on the board, clamped to `1..20`. Default: `4`. |
@@ -236,14 +236,14 @@ Mode and game options:
 Examples:
 
 ```bash
-sss --fps 0.2
-sss watch --fps 0.2
+sss --fps 1
+sss watch --fps 1
 sss game --fps 5 --theme ocean --width 60 --height 18
 sss game --fruits 8 --big-food
 sss game --debug-ai --debug-hitbox
 sss game --ai smart --path-refresh 15
 sss game --ai dumb --width 80 --height 24
-sss-snake game 0.20 --theme matrix
+sss-snake game 1 --theme matrix
 ```
 
 ### Game Controls
@@ -356,7 +356,7 @@ SSS Snake — лёгкий экран активности для SSH-сесси
 ```text
  SSS Snake idle | session active
  host:server | load:0.08 0.03 0.01 | time:07:45:12
- status: low CPU mode | fps:0.2 | AI:off
+ status: low CPU mode | fps:1 | AI:off
 
         @----
 
@@ -378,7 +378,7 @@ sss snake    # алиас для sss game
 Idle mode:
 
 - режим по умолчанию для `sss`
-- обновляется с `0.2 FPS` по умолчанию, примерно раз в 5 секунд
+- обновляется с `1 FPS` по умолчанию, примерно раз в секунду
 - диапазон FPS для idle/watch: `0.2..1`
 - без AI, фруктов, поиска пути и игрового поля
 - hostname читается один раз при запуске
@@ -387,7 +387,7 @@ Idle mode:
 Game mode:
 
 - запускается через `sss game`, `sss --game` или `sss-snake game`
-- FPS игры по умолчанию: `5`
+- FPS игры по умолчанию: `1`
 - максимум для игры: `10 FPS`
 - AUTO по умолчанию использует лёгкий `--ai dumb`
 - `--ai smart` тяжелее и включается только явно
@@ -472,7 +472,7 @@ sss-snake --version
 
 | Флаг | Поведение |
 | --- | --- |
-| `--fps N` | FPS. По умолчанию: idle/watch `0.2`, игра `5`; лимит idle/watch `1`, лимит игры `10`. |
+| `--fps N` | FPS. По умолчанию: idle/watch `1`, игра `1`; лимит idle/watch `1`, лимит игры `10`. |
 | `--width N` | Ширина поля в game mode. |
 | `--height N` | Высота поля в game mode. |
 | `--fruits N` | Количество фруктов на поле, `1..20`. По умолчанию: `4`. |
@@ -498,14 +498,14 @@ sss-snake --version
 Примеры:
 
 ```bash
-sss --fps 0.2
-sss watch --fps 0.2
+sss --fps 1
+sss watch --fps 1
 sss game --fps 5 --theme ocean --width 60 --height 18
 sss game --fruits 8 --big-food
 sss game --debug-ai --debug-hitbox
 sss game --ai smart --path-refresh 15
 sss game --ai dumb --width 80 --height 24
-sss-snake game 0.20 --theme matrix
+sss-snake game 1 --theme matrix
 ```
 
 ### Управление в игре

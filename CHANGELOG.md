@@ -5,6 +5,7 @@
 - Made `sss` start a low CPU idle screen by default; use `sss game`, `sss --game`, or `sss snake` for the playable snake.
 - Added explicit `idle`, `game`, and `watch` modes.
 - Set idle/watch default FPS to `1` and capped idle/watch at `1 FPS`.
+- Changed the idle animation to move a connected decorative snake instead of separating the head from the body.
 - Lowered game default FPS to `1`; higher game speed must be requested explicitly with `--fps`.
 - Changed game AUTO default to lightweight `--ai dumb`; `--ai smart` remains explicit.
 - Initialized AI target/debug/path state before the first game frame and on board reset, fixing immediate `[exited]` failures under `set -u`.

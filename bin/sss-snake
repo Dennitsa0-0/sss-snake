@@ -1567,7 +1567,7 @@ draw_activity() {
   refresh_status 0
   frame=$((SECONDS % 6 + 1))
   pad='      '
-  snake="@${pad:0:$frame}----"
+  snake="${pad:0:$frame}@----"
   load_text="$STATUS_LOAD"
   fps_text="${FPS_ARG:-1}"
   [[ "$label" == 'watch' ]] && snake='@--'

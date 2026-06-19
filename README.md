@@ -1,4 +1,4 @@
-﻿# SSS Snake
+# SSS Snake
 
 <p align="center">
   <a href="#english">English</a> |

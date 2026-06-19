@@ -1434,6 +1434,25 @@ read_key() {
   fi
 }
 
+read_key_into() {
+  local first rest
+  KEY_READ=''
+  first=''
+  rest=''
+
+  if ! IFS= read -rsn1 -t "$DELAY" first; then
+    return 1
+  fi
+
+  if [[ -z "$first" ]]; then
+    KEY_READ='ENTER'
+  elif [[ "$first" == $'\e' ]]; then
+    IFS= read -rsn2 -t 0.001 rest || true
+    KEY_READ="$first$rest"
+  else
+    KEY_READ="$first"
+  fi
+}
 draw_line() {
   printf '\033[K%s\n' "$1"
 }
@@ -1553,7 +1572,11 @@ run_activity_screen() {
   refresh_status 1
   while true; do
     draw_activity "$RUN_MODE"
-    key="$(read_key || true)"
+    if read_key_into; then
+      key="$KEY_READ"
+    else
+      key=''
+    fi
     case "$key" in
       g|G|ENTER)
         return 0
@@ -1577,7 +1600,11 @@ run_game_loop() {
   while true; do
     draw
 
-    key="$(read_key || true)"
+    if read_key_into; then
+      key="$KEY_READ"
+    else
+      key=''
+    fi
     if [[ -n "$key" ]]; then
       handle_key "$key"
     else

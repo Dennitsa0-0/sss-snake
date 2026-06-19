@@ -1,0 +1,10 @@
+* text=auto
+
+*.sh text eol=lf
+bin/sss text eol=lf
+bin/sss-snake text eol=lf
+install.sh text eol=lf
+Makefile text eol=lf
+*.md text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf

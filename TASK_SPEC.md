@@ -222,6 +222,11 @@ Then the game runs directly.
 - If set to any value, `sss` does not ask to install tmux.
 - This is equivalent to the no-prompt part of `--no-install`.
 
+## Line Endings
+
+All shell scripts and project text files must use LF line endings, not CRLF. A stray Windows CR character in `bin/sss`, `bin/sss-snake`, or `install.sh` can break Bash parsing after installation.
+
+The repository enforces this with `.gitattributes`, `make lint`, and CI.
 ## 6. Safety Requirements
 
 The utility must not:
